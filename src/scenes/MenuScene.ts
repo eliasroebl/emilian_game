@@ -70,12 +70,12 @@ export class MenuScene extends Phaser.Scene {
     });
 
     // Controls info
-    const controlsText = this.add.text(width / 2, 500,
+    const controlsText = this.add.text(width / 2, 480,
       'Steuerung:\n' +
       'Pfeiltasten / WASD - Bewegen\n' +
-      'LEERTASTE - Springen\n' +
-      'X - Angreifen\n' +
-      'C - Ausweichen',
+      'LEERTASTE - Springen (kurz tippen = kleiner Hopser, halten = hoher Sprung)\n' +
+      'Wand berühren + LEERTASTE - Wandsprung ← NEU!\n' +
+      'X - Angreifen  |  C - Ausweichen',
       {
         fontSize: '16px',
         color: '#ffffff',

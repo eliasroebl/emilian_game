@@ -12,7 +12,6 @@ export interface EnemyConfig {
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private health: number;
-  private maxHealth: number;
   private damage: number;
   private speed: number;
   private points: number;
@@ -41,7 +40,6 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setScale(config.scale || 2);
 
     // Store config
-    this.maxHealth = config.health;
     this.health = config.health;
     this.damage = config.damage;
     this.speed = config.speed;

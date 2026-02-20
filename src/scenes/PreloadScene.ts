@@ -163,38 +163,23 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   private loadItemAssets(): void {
-    // Load fruit/item spritesheets (they are animated, 32x32 frames)
-    this.load.spritesheet('apple', 'assets/items/Apple.png', {
-      frameWidth: 32,
-      frameHeight: 32,
-    });
-    this.load.spritesheet('banana', 'assets/items/Bananas.png', {
-      frameWidth: 32,
-      frameHeight: 32,
-    });
-    this.load.spritesheet('cherry', 'assets/items/Cherries.png', {
-      frameWidth: 32,
-      frameHeight: 32,
-    });
-    this.load.spritesheet('kiwi', 'assets/items/Kiwi.png', {
-      frameWidth: 32,
-      frameHeight: 32,
-    });
-    this.load.spritesheet('melon', 'assets/items/Melon.png', {
-      frameWidth: 32,
-      frameHeight: 32,
-    });
-    this.load.spritesheet('orange', 'assets/items/Orange.png', {
-      frameWidth: 32,
-      frameHeight: 32,
-    });
-    this.load.spritesheet('pineapple', 'assets/items/Pineapple.png', {
-      frameWidth: 32,
-      frameHeight: 32,
-    });
-    this.load.spritesheet('strawberry', 'assets/items/Strawberry.png', {
-      frameWidth: 32,
-      frameHeight: 32,
+    // Fruit collectibles — all 32×32 frames, 17 frames each
+    this.load.spritesheet('apple',      'assets/items/Apple.png',      { frameWidth: 32, frameHeight: 32 });
+    this.load.spritesheet('banana',     'assets/items/Bananas.png',    { frameWidth: 32, frameHeight: 32 });
+    this.load.spritesheet('cherry',     'assets/items/Cherries.png',   { frameWidth: 32, frameHeight: 32 });
+    this.load.spritesheet('kiwi',       'assets/items/Kiwi.png',       { frameWidth: 32, frameHeight: 32 });
+    this.load.spritesheet('melon',      'assets/items/Melon.png',      { frameWidth: 32, frameHeight: 32 });
+    this.load.spritesheet('orange',     'assets/items/Orange.png',     { frameWidth: 32, frameHeight: 32 });
+    this.load.spritesheet('pineapple',  'assets/items/Pineapple.png',  { frameWidth: 32, frameHeight: 32 });
+    this.load.spritesheet('strawberry', 'assets/items/Strawberry.png', { frameWidth: 32, frameHeight: 32 });
+
+    // Level goal sprites
+    // End (Idle) is a single 64×64 image — load as a plain image, not a spritesheet
+    this.load.image('end-idle', 'assets/items/End (Idle).png');
+    // End (Pressed) is an 8-frame 512×64 spritesheet
+    this.load.spritesheet('end-pressed', 'assets/items/End (Pressed) (64x64).png', {
+      frameWidth: 64,
+      frameHeight: 64,
     });
   }
 
@@ -255,6 +240,14 @@ export class PreloadScene extends Phaser.Scene {
       frames: this.anims.generateFrameNumbers('player-hit', { start: 0, end: 6 }),
       frameRate: 10,
       repeat: 0,
+    });
+
+    // Wall-jump / wall-slide animation — loops while player is on the wall
+    this.anims.create({
+      key: 'player-wall-jump-anim',
+      frames: this.anims.generateFrameNumbers('player-wall-jump', { start: 0, end: 4 }),
+      frameRate: 10,
+      repeat: -1,
     });
 
     // Mushroom animations
@@ -359,6 +352,43 @@ export class PreloadScene extends Phaser.Scene {
       frames: this.anims.generateFrameNumbers('melon', { start: 0, end: 16 }),
       frameRate: 15,
       repeat: -1,
+    });
+
+    // Additional fruit animations used by the level
+    this.anims.create({
+      key: 'strawberry-anim',
+      frames: this.anims.generateFrameNumbers('strawberry', { start: 0, end: 16 }),
+      frameRate: 15,
+      repeat: -1,
+    });
+
+    this.anims.create({
+      key: 'orange-anim',
+      frames: this.anims.generateFrameNumbers('orange', { start: 0, end: 16 }),
+      frameRate: 15,
+      repeat: -1,
+    });
+
+    this.anims.create({
+      key: 'pineapple-anim',
+      frames: this.anims.generateFrameNumbers('pineapple', { start: 0, end: 16 }),
+      frameRate: 15,
+      repeat: -1,
+    });
+
+    this.anims.create({
+      key: 'banana-anim',
+      frames: this.anims.generateFrameNumbers('banana', { start: 0, end: 16 }),
+      frameRate: 15,
+      repeat: -1,
+    });
+
+    // Level-end goal animation (plays when player touches the end flag)
+    this.anims.create({
+      key: 'end-pressed-anim',
+      frames: this.anims.generateFrameNumbers('end-pressed', { start: 0, end: 7 }),
+      frameRate: 10,
+      repeat: 0,
     });
   }
 }

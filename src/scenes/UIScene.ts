@@ -6,10 +6,6 @@ export class UIScene extends Phaser.Scene {
   private healthText!: Phaser.GameObjects.Text;
   private livesText!: Phaser.GameObjects.Text;
   private scoreText!: Phaser.GameObjects.Text;
-  private playerNameText!: Phaser.GameObjects.Text;
-
-  private currentHealth: number = 100;
-  private maxHealth: number = 100;
 
   constructor() {
     super({ key: 'UIScene' });
@@ -17,8 +13,8 @@ export class UIScene extends Phaser.Scene {
 
   create(): void {
     // Player name display
-    const playerName = this.registry.get('playerName') || 'Held';
-    this.playerNameText = this.add.text(16, 16, playerName, {
+    const playerName = (this.registry.get('playerName') as string) || 'Held';
+    this.add.text(16, 16, playerName, {
       fontSize: '20px',
       color: '#FFD700',
       fontStyle: 'bold',
@@ -53,7 +49,7 @@ export class UIScene extends Phaser.Scene {
       stroke: '#000000',
       strokeThickness: 2,
     });
-    this.updateLives(this.registry.get('lives') || 3);
+    this.updateLives((this.registry.get('lives') as number) || 3);
 
     // Score display
     this.scoreText = this.add.text(784, 16, 'Punkte: 0', {
@@ -75,8 +71,8 @@ export class UIScene extends Phaser.Scene {
     worldText.setOrigin(0.5, 0);
 
     // Controls hint (bottom)
-    const controlsHint = this.add.text(400, 580, 'Pfeiltasten: Bewegen | SPACE: Springen | X: Angriff | C: Ausweichen', {
-      fontSize: '12px',
+    const controlsHint = this.add.text(400, 580, 'Pfeiltasten/WASD: Bewegen | SPACE: Springen | Wand berühren + SPACE: Wandsprung | X: Angriff | C: Ausweichen', {
+      fontSize: '11px',
       color: '#cccccc',
       stroke: '#000000',
       strokeThickness: 2,
@@ -111,9 +107,6 @@ export class UIScene extends Phaser.Scene {
   }
 
   private updateHealthBar(health: number, maxHealth: number): void {
-    this.currentHealth = health;
-    this.maxHealth = maxHealth;
-
     this.healthBar.clear();
 
     // Border

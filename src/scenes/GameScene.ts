@@ -1,3 +1,25 @@
+/**
+ * GameScene — Level 1: "Das große Abenteuer"
+ *
+ * Level design philosophy:
+ *   Zone 1 (Tutorial):  Walk, discover jump, meet first enemy (slow mushroom)
+ *   Zone 2 (Platforms): Learn to chain jumps — a staircase of rising platforms
+ *   Zone 3 (Chimney):   OPTIONAL wall-jump section — two walls players can climb
+ *                        for an extra life (Melon). If they ignore it, the ground
+ *                        path continues freely beneath the walls.
+ *   Zone 4 (Plants):    First ranged enemy (plant that shoots) + platform mix
+ *   Zone 5 (Rush):      Challenge with every enemy type, leads to the end flag
+ *
+ * Physics reference (at scale 2×):
+ *   Player body: 40×56 px world units.  sprite.y = body_bottom - 32.
+ *   Standing on ground (tile y=550): sprite.y ≈ 510, body [486, 542]
+ *   Standing on platform y_tile:     sprite.y = y_tile - 40
+ *   Normal jump apex:  ~100 px above standing position
+ *   Wall jump:         same apex height + horizontal kick of 180 px/s
+ *   Chimney wall bottom tile at y=460 → tile bottom at y=468 < player body
+ *   top at y=486 when on ground → player walks freely beneath the walls.
+ */
+
 import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { Enemy, EnemyFactory, PlantEnemy } from '../entities/Enemy';
@@ -9,195 +31,223 @@ export class GameScene extends Phaser.Scene {
   private enemies!: Phaser.Physics.Arcade.Group;
   private plantEnemies: PlantEnemy[] = [];
   private items!: Phaser.Physics.Arcade.Group;
+  private goalSprite!: Phaser.Physics.Arcade.Sprite;
 
   private background!: Phaser.GameObjects.TileSprite;
+  private levelComplete: boolean = false;
+
+  // Terrain tile frames from the 22×11 spritesheet (352×176 px, 16×16 each)
+  private static readonly TILE_GRASS = 96;   // green top tile
+  private static readonly TILE_DIRT  = 118;  // dark soil tile (used for walls)
 
   constructor() {
     super({ key: 'GameScene' });
   }
 
   create(): void {
-    // Set world bounds for the level (wider than camera)
-    this.physics.world.setBounds(0, 0, 2500, 600);
+    this.levelComplete = false;
+    this.plantEnemies  = [];
 
-    // Setup background
+    // ── World & camera setup ─────────────────────────────────────────────────
+    this.physics.world.setBounds(0, 0, 2500, 600);
+    this.cameras.main.setBounds(0, 0, 2500, 600);
+
+    // Scrolling background (parallax later in update)
     this.background = this.add.tileSprite(0, 0, 800, 600, 'bg-green');
     this.background.setOrigin(0, 0);
     this.background.setScrollFactor(0);
 
-    // Set camera bounds
-    this.cameras.main.setBounds(0, 0, 2500, 600);
-
-    // Create platforms
+    // ── Level construction ───────────────────────────────────────────────────
     this.createPlatforms();
 
-    // Create player (spawn above ground level)
-    const playerName = this.registry.get('playerName') || 'Held';
+    // ── Player ───────────────────────────────────────────────────────────────
+    const playerName = (this.registry.get('playerName') as string) || 'Held';
     console.log(`Willkommen, ${playerName}!`);
     this.player = new Player(this, 100, 480);
 
-    // Create enemies group
-    this.enemies = this.physics.add.group({
-      runChildUpdate: true,
-    });
+    // ── Groups ───────────────────────────────────────────────────────────────
+    this.enemies = this.physics.add.group({ runChildUpdate: true });
+    this.items   = this.physics.add.group();
 
-    // Create items group
-    this.items = this.physics.add.group();
+    // ── Goal (end flag) ──────────────────────────────────────────────────────
+    // Place flag so its visual bottom rests on the ground (tile top ≈ 542).
+    // end-idle is 64×64; at scale 2 → 128×128; center y = 542 − 64 = 478.
+    this.goalSprite = this.physics.add.staticSprite(2420, 478, 'end-idle');
+    this.goalSprite.setScale(2);
+    this.goalSprite.refreshBody();
 
-    // Spawn enemies
     this.spawnEnemies();
-
-    // Spawn items
     this.spawnItems();
-
-    // Setup collisions
     this.setupCollisions();
-
-    // Setup event listeners
     this.setupEvents();
+    this.addZoneHints();
 
-    // Camera follows player
-    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setDeadzone(100, 100);
+    // Camera follows player with a comfortable deadzone
+    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    this.cameras.main.setDeadzone(120, 80);
   }
+
+  // ── Platform construction ────────────────────────────────────────────────────
 
   private createPlatforms(): void {
     this.platforms = this.physics.add.staticGroup();
 
-    const grassFrame = 96; // Top grass tile
-
-    // Ground - full level width
+    // Full-width grass ground (y = 550, spans entire level)
     for (let x = 0; x < 2500; x += 16) {
-      const tile = this.platforms.create(x + 8, 550, 'terrain', grassFrame) as Phaser.Physics.Arcade.Sprite;
-      tile.refreshBody();
+      const t = this.platforms.create(x + 8, 550, 'terrain', GameScene.TILE_GRASS) as Phaser.Physics.Arcade.Sprite;
+      t.refreshBody();
     }
 
-    // Add dirt below ground for visual depth
+    // Decorative dirt rows below ground (no physics, just visual depth)
     for (let x = 0; x < 2500; x += 16) {
-      this.add.image(x + 8, 566, 'terrain', 118);
-      this.add.image(x + 8, 582, 'terrain', 118);
+      this.add.image(x + 8, 566, 'terrain', GameScene.TILE_DIRT);
+      this.add.image(x + 8, 582, 'terrain', GameScene.TILE_DIRT);
     }
 
-    // === LEVEL DESIGN ===
-    // Section 1: Tutorial area (easy platforms, mushrooms)
-    this.createPlatform(180, 480, 4);   // Low platform
-    this.createPlatform(320, 420, 5);   // Medium platform
-    this.createPlatform(500, 360, 4);   // Higher platform
+    // ── Zone 1 platforms (x: 0 – 700): intro hops ───────────────────────────
+    //    Three progressively higher platforms teaching the jump mechanic.
+    this.createPlatform(210, 488, 3);   // low hop, cherry on top
+    this.createPlatform(390, 456, 4);   // second hop
+    this.createPlatform(570, 424, 3);   // third hop, mushroom patrol
 
-    // Section 2: First challenge (radishes on platforms)
-    this.createPlatform(700, 480, 6);   // Ground level platform
-    this.createPlatform(850, 400, 5);   // Jump up
-    this.createPlatform(1020, 330, 4);  // Higher
+    // ── Zone 2 platforms (x: 700 – 1100): the staircase ─────────────────────
+    //    Rising platforms with a radish on the top — first aerial enemy.
+    this.createPlatform(740, 472, 3);   // step stone
+    this.createPlatform(880, 424, 5);   // mid-staircase, radish here
+    this.createPlatform(1030, 368, 4);  // top of staircase, apple reward
 
-    // Section 3: Plant turret area
-    this.createPlatform(1200, 480, 5);  // Recovery platform
-    this.createPlatform(1350, 400, 6);  // Plant platform (wide for dodging)
-    this.createPlatform(1550, 330, 5);  // Higher platform with item
+    // ── Zone 3 walls (x: 1100 – 1300): the chimney ──────────────────────────
+    //    Two vertical walls players can use for wall-jumping.
+    //    Wall tile bottom at y=468 → tile bottom edge = 476.
+    //    Player body top when walking at ground = 486 → walls don't block passage!
+    //    The ground below is clear; the chimney is purely optional.
+    this.createChimneyWall(1158, 268, 460);  // left wall  (center x=1158)
+    this.createChimneyWall(1254, 268, 460);  // right wall (center x=1254)
+    //    Gap between inner wall edges: (1254-8) − (1158+8) = 1246 − 1166 = 80 px
+    //    Platform at the top — spans both walls so a wall-jumping player lands safely.
+    this.createPlatform(1128, 228, 10); // 160 px wide: x 1136–1296
 
-    // Section 4: Gauntlet (multiple enemies)
-    this.createPlatform(1750, 450, 4);
-    this.createPlatform(1900, 380, 5);
-    this.createPlatform(2050, 300, 6);  // High platform with plant
-    this.createPlatform(2250, 380, 5);  // Final stretch
+    // ── Zone 4 platforms (x: 1400 – 1900): plant territory ──────────────────
+    //    Plant enemy sits on the elevated platform and shoots at the player.
+    //    Smaller platforms around it force careful movement.
+    this.createPlatform(1440, 488, 4);  // recovery after chimney
+    this.createPlatform(1580, 448, 5);  // medium, plant here
+    this.createPlatform(1750, 392, 4);  // high, radish here
 
-    // Add some decorative elements (non-collision)
-    this.addDecorations();
+    // ── Zone 5 platforms (x: 1900 – 2500): the final rush ───────────────────
+    //    Mix of all enemy types, stepping platform variety, end flag at x=2420.
+    this.createPlatform(1950, 472, 3);
+    this.createPlatform(2090, 420, 4);  // chicken here
+    this.createPlatform(2260, 472, 3);
   }
 
-  private createPlatform(x: number, y: number, width: number): void {
-    const grassFrame = 96;
-
-    for (let i = 0; i < width; i++) {
-      const tile = this.platforms.create(x + i * 16 + 8, y, 'terrain', grassFrame) as Phaser.Physics.Arcade.Sprite;
-      tile.refreshBody();
+  /**
+   * Creates a horizontal platform of `widthTiles` tiles at (x, y).
+   * x is the LEFT edge of the first tile; tiles are 16 px wide.
+   */
+  private createPlatform(x: number, y: number, widthTiles: number): void {
+    for (let i = 0; i < widthTiles; i++) {
+      const t = this.platforms.create(
+        x + i * 16 + 8, y,
+        'terrain', GameScene.TILE_GRASS,
+      ) as Phaser.Physics.Arcade.Sprite;
+      t.refreshBody();
     }
   }
 
-  private addDecorations(): void {
-    // Add some visual variety with decorative tiles (no collision)
-    // These are just background elements
-    const decorPositions = [150, 450, 900, 1400, 1800, 2200];
-    decorPositions.forEach(x => {
-      // Small grass tufts or rocks could go here
-      // Using terrain tiles as decoration
-      this.add.image(x, 540, 'terrain', 97).setAlpha(0.5);
-    });
+  /**
+   * Creates a single-tile-wide vertical wall from yTop to yBottom (inclusive),
+   * spaced every 16 px.  Uses the dirt tile so it looks distinct from platforms.
+   * centerX is the world center x of the column.
+   */
+  private createChimneyWall(centerX: number, yTop: number, yBottom: number): void {
+    for (let y = yTop; y <= yBottom; y += 16) {
+      const t = this.platforms.create(
+        centerX, y,
+        'terrain', GameScene.TILE_DIRT,
+      ) as Phaser.Physics.Arcade.Sprite;
+      t.refreshBody();
+    }
   }
+
+  // ── Enemy spawning ───────────────────────────────────────────────────────────
 
   private spawnEnemies(): void {
-    // === SECTION 1: Tutorial (Mushrooms only) ===
-    // Ground mushrooms - easy to avoid
-    const mushroom1 = EnemyFactory.createMushroom(this, 300, 480);
-    mushroom1.setPatrolDistance(80);
-    this.enemies.add(mushroom1);
+    // ─ Zone 1: two slow mushrooms — easy for a first encounter ───────────────
+    const m1 = EnemyFactory.createMushroom(this, 310, 480);
+    m1.setPatrolDistance(60);
+    this.enemies.add(m1);
 
-    const mushroom2 = EnemyFactory.createMushroom(this, 550, 480);
-    mushroom2.setPatrolDistance(100);
-    this.enemies.add(mushroom2);
+    const m2 = EnemyFactory.createMushroom(this, 600, 480);
+    m2.setPatrolDistance(50);
+    this.enemies.add(m2);
 
-    // === SECTION 2: Radishes (faster, more aggressive) ===
-    // Radish on platform
-    const radish1 = EnemyFactory.createRadish(this, 880, 360);
-    radish1.setPatrolDistance(60);
-    this.enemies.add(radish1);
+    // ─ Zone 2: radish on the staircase — first platform encounter ────────────
+    //   Spawn slightly above platform surface so it falls and lands correctly.
+    //   Platform y=424: enemy spawn y = 424 - 40 = 384.
+    const r1 = EnemyFactory.createRadish(this, 912, 384);
+    r1.setPatrolDistance(30);   // narrow patrol so it stays on the 5-tile platform
+    this.enemies.add(r1);
 
-    // Ground radish
-    const radish2 = EnemyFactory.createRadish(this, 950, 480);
-    radish2.setPatrolDistance(100);
-    this.enemies.add(radish2);
+    // A slow mushroom on the ground near the staircase entrance
+    const m3 = EnemyFactory.createMushroom(this, 790, 480);
+    m3.setPatrolDistance(40);
+    this.enemies.add(m3);
 
-    // === SECTION 3: Plants (stationary, shoot projectiles) ===
-    // Plant on elevated platform - player must dodge bullets
-    const plant1 = EnemyFactory.createPlant(this, 1400, 360);
+    // ─ Zone 4: plant + mushroom pairing — player must dodge shots ────────────
+    //   Plant on the elevated platform (y=448), mushroom below on the ground.
+    //   Plant spawn: y = 448 - 40 = 408 (above platform, falls on it).
+    const plant1 = EnemyFactory.createPlant(this, 1614, 408);
     this.plantEnemies.push(plant1);
     this.enemies.add(plant1);
 
-    // Mushroom below to pressure player
-    const mushroom3 = EnemyFactory.createMushroom(this, 1250, 480);
-    this.enemies.add(mushroom3);
+    const m4 = EnemyFactory.createMushroom(this, 1470, 480);
+    m4.setPatrolDistance(30);
+    this.enemies.add(m4);
 
-    // === SECTION 4: Gauntlet (mix of all enemies) ===
-    // Ground enemies
-    const radish3 = EnemyFactory.createRadish(this, 1800, 480);
-    radish3.setPatrolDistance(80);
-    this.enemies.add(radish3);
+    // Radish on the high platform (y=392): spawn y = 392 - 40 = 352.
+    const r2 = EnemyFactory.createRadish(this, 1778, 352);
+    r2.setPatrolDistance(25);
+    this.enemies.add(r2);
 
-    const mushroom4 = EnemyFactory.createMushroom(this, 2000, 480);
-    this.enemies.add(mushroom4);
+    // ─ Zone 5: full mix — the final challenge ────────────────────────────────
+    const m5 = EnemyFactory.createMushroom(this, 1980, 432);
+    m5.setPatrolDistance(20);
+    this.enemies.add(m5);
 
-    // Platform radish
-    const radish4 = EnemyFactory.createRadish(this, 1930, 340);
-    radish4.setPatrolDistance(50);
-    this.enemies.add(radish4);
+    // Chicken on mid platform (y=420): spawn y = 420 - 40 = 380.
+    // Chicken is a new, slightly faster enemy — exciting reveal before the goal.
+    const c1 = EnemyFactory.createChicken(this, 2122, 380);
+    c1.setPatrolDistance(30);
+    this.enemies.add(c1);
 
-    // Final plant - guarding the end
-    const plant2 = EnemyFactory.createPlant(this, 2100, 260);
-    this.plantEnemies.push(plant2);
-    this.enemies.add(plant2);
-
-    // Last defender
-    const radish5 = EnemyFactory.createRadish(this, 2300, 340);
-    radish5.setPatrolDistance(60);
-    this.enemies.add(radish5);
+    const m6 = EnemyFactory.createMushroom(this, 2300, 480);
+    m6.setPatrolDistance(60);
+    this.enemies.add(m6);
   }
 
+  // ── Collectible spawning ─────────────────────────────────────────────────────
+
   private spawnItems(): void {
-    // Section 1: Easy pickups
-    this.createItem(230, 440, 'apple', 'health');      // On first platform
-    this.createItem(370, 380, 'cherry', 'attack');     // Attack boost early
+    // ─ Zone 1: reward for the first jump ─────────────────────────────────────
+    this.createItem(242,  448, 'cherry',     'health');  // above first platform
 
-    // Section 2: Rewards for platforming
-    this.createItem(1050, 290, 'apple', 'health');     // After climbing
-    this.createItem(880, 360, 'kiwi', 'defense');      // Defense for plant section
+    // ─ Zone 2: reward at top of staircase ────────────────────────────────────
+    this.createItem(1062, 326, 'apple',      'health');  // above staircase peak
 
-    // Section 3: Mid-level recovery
-    this.createItem(1250, 440, 'apple', 'health');     // Before plant
-    this.createItem(1580, 290, 'cherry', 'attack');    // Attack boost for gauntlet
+    // ─ Zone 3: chimney collectibles ──────────────────────────────────────────
+    //   Strawberry floats in the middle of the chimney gap — entices the player in
+    this.createItem(1204, 370, 'strawberry', 'health');
+    //   Melon waits at the TOP — the grand reward for completing the wall jump
+    this.createItem(1204, 186, 'melon',      'life');
 
-    // Section 4: Final stretch rewards
-    this.createItem(1930, 340, 'apple', 'health');     // Mid gauntlet
-    this.createItem(2100, 260, 'kiwi', 'defense');     // Near final plant
-    this.createItem(2350, 340, 'melon', 'life');       // Extra life reward at end
+    // ─ Zone 4: risky apple near the plant enemy ───────────────────────────────
+    this.createItem(1614, 400, 'apple',      'health');  // near plant (risky grab)
+    this.createItem(1782, 352, 'kiwi',       'defense'); // on high platform
+
+    // ─ Zone 5: final stretch rewards ─────────────────────────────────────────
+    this.createItem(2124, 378, 'orange',     'attack');  // near chicken
+    this.createItem(2380, 480, 'pineapple',  'health');  // right before goal
   }
 
   private createItem(x: number, y: number, sprite: string, type: string): void {
@@ -205,218 +255,310 @@ export class GameScene extends Phaser.Scene {
     item.setScale(1.5);
     item.setData('type', type);
 
-    // Play item animation
     const animKey = `${sprite}-anim`;
     if (this.anims.exists(animKey)) {
       item.play(animKey);
     }
 
-    // Disable gravity for items
     const body = item.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
 
-    // Floating animation
+    // Gentle floating animation
     this.tweens.add({
-      targets: item,
-      y: y - 10,
-      duration: 1000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
+      targets:  item,
+      y:        y - 8,
+      duration: 900,
+      yoyo:     true,
+      repeat:   -1,
+      ease:     'Sine.easeInOut',
     });
   }
 
+  // ── Zone hints ───────────────────────────────────────────────────────────────
+  // Subtle text hints attached to key spots (scroll with the world).
+
+  private addZoneHints(): void {
+    // Chimney entrance hint — disappears after the player moves past
+    this.add.text(1200, 510, '↑ Wandsprung?', {
+      fontSize: '12px',
+      color: '#ffe066',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(0.5);
+
+    // Goal marker text
+    this.add.text(2420, 440, '🏁 Ziel!', {
+      fontSize: '18px',
+      color: '#FFD700',
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+  }
+
+  // ── Collision & overlap setup ────────────────────────────────────────────────
+
   private setupCollisions(): void {
-    // Player vs platforms
+    // Player ↔ platforms (solid floor/walls)
     this.physics.add.collider(this.player, this.platforms);
 
-    // Enemies vs platforms
+    // Enemies ↔ platforms (so they don't fall through the floor)
     this.physics.add.collider(this.enemies, this.platforms);
 
-    // Player vs enemies
+    // Player ↔ enemies — overlap (no push-back; we handle damage manually)
     this.physics.add.overlap(
       this.player,
       this.enemies,
-      this.handlePlayerEnemyCollision,
-      undefined,
-      this
+      (playerObj, enemyObj) => {
+        const p = playerObj as Player;
+        const e = enemyObj as Enemy | PlantEnemy;
+        if (!e.isEnemyDead() && !p.isPlayerInvincible()) {
+          p.takeDamage(e.getDamage());
+        }
+      },
     );
 
-    // Player vs items
+    // Player ↔ items
     this.physics.add.overlap(
       this.player,
       this.items,
-      this.handleItemCollection,
-      undefined,
-      this
+      (playerObj, itemObj) => {
+        this.handleItemCollection(playerObj as Player, itemObj as Phaser.Physics.Arcade.Sprite);
+      },
     );
 
-    // Player vs plant bullets
+    // Player ↔ level goal
+    this.physics.add.overlap(
+      this.player,
+      this.goalSprite,
+      () => { this.handleLevelComplete(); },
+    );
+
+    // Player ↔ each plant's bullet group
     this.plantEnemies.forEach(plant => {
       this.physics.add.overlap(
         this.player,
         plant.getBullets(),
-        this.handleBulletHit,
-        undefined,
-        this
+        (playerObj, bulletObj) => {
+          const p = playerObj as Player;
+          const bullet = bulletObj as Phaser.Physics.Arcade.Image;
+          if (!p.isPlayerInvincible()) {
+            p.takeDamage(10);
+            bullet.destroy();
+          }
+        },
       );
     });
   }
 
-  private setupEvents(): void {
-    // Handle player attack hitting enemies
-    this.events.on('playerAttack', (hitbox: Phaser.GameObjects.Rectangle, damage: number) => {
-      this.enemies.getChildren().forEach((enemy) => {
-        const e = enemy as Enemy | PlantEnemy;
-        if (!e.isEnemyDead()) {
-          const bounds = hitbox.getBounds();
-          const enemyBounds = e.getBounds();
+  // ── Event listeners ──────────────────────────────────────────────────────────
 
-          if (Phaser.Geom.Rectangle.Overlaps(bounds, enemyBounds)) {
-            e.takeDamage(damage);
-          }
+  private setupEvents(): void {
+    // Player's attack hitbox hits enemies
+    this.events.on('playerAttack', (hitbox: Phaser.GameObjects.Rectangle, damage: number) => {
+      const bounds = hitbox.getBounds();
+      this.enemies.getChildren().forEach(enemy => {
+        const e = enemy as Enemy | PlantEnemy;
+        if (!e.isEnemyDead() && Phaser.Geom.Rectangle.Overlaps(bounds, e.getBounds())) {
+          e.takeDamage(damage);
         }
       });
     });
 
-    // Handle enemy killed
     this.events.on('enemyKilled', (points: number) => {
-      const currentScore = this.registry.get('score') || 0;
-      this.registry.set('score', currentScore + points);
-      this.events.emit('scoreUpdated', currentScore + points);
+      const current = (this.registry.get('score') as number) || 0;
+      this.registry.set('score', current + points);
+      this.events.emit('scoreUpdated', current + points);
     });
 
-    // Handle player death
-    this.events.on('playerDied', () => {
-      this.handlePlayerDeath();
-    });
+    this.events.on('playerDied', () => { this.handlePlayerDeath(); });
   }
 
-  private handlePlayerEnemyCollision(
-    playerObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
-    enemyObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
-  ): void {
-    const player = playerObj as Player;
-    const enemy = enemyObj as Enemy | PlantEnemy;
+  // ── Item collection ──────────────────────────────────────────────────────────
 
-    if (!enemy.isEnemyDead() && !player.isPlayerInvincible()) {
-      player.takeDamage(enemy.getDamage());
-    }
-  }
-
-  private handleBulletHit(
-    playerObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
-    bulletObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
-  ): void {
-    const player = playerObj as Player;
-    const bullet = bulletObj as Phaser.Physics.Arcade.Image;
-
-    if (!player.isPlayerInvincible()) {
-      player.takeDamage(10); // Bullet damage
-      bullet.destroy();
-    }
-  }
-
-  private handleItemCollection(
-    playerObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
-    itemObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
-  ): void {
-    const player = playerObj as Player;
-    const item = itemObj as Phaser.Physics.Arcade.Sprite;
-    const type = item.getData('type');
+  private handleItemCollection(player: Player, item: Phaser.Physics.Arcade.Sprite): void {
+    const type = item.getData('type') as string;
 
     switch (type) {
-      case 'health':
+      case 'health': {
         player.heal(GAME_CONFIG.ITEMS.HEALTH_POTION.healAmount);
-        this.showItemPickupText('+50 HP!', item.x, item.y);
+        this.showPickupText('+50 HP! ❤️', item.x, item.y, '#66ff66');
         break;
-
-      case 'attack':
-        const currentAttack = this.registry.get('attackBoost') || 1;
-        this.registry.set('attackBoost', currentAttack * GAME_CONFIG.ITEMS.ATTACK_BOOST.multiplier);
-        this.showItemPickupText('Angriff +25%!', item.x, item.y);
+      }
+      case 'attack': {
+        const cur = (this.registry.get('attackBoost') as number) || 1;
+        this.registry.set('attackBoost', cur * GAME_CONFIG.ITEMS.ATTACK_BOOST.multiplier);
+        this.showPickupText('Angriff ↑', item.x, item.y, '#ff9900');
         this.time.delayedCall(GAME_CONFIG.ITEMS.ATTACK_BOOST.duration, () => {
           this.registry.set('attackBoost', 1);
         });
         break;
-
-      case 'defense':
-        const currentDefense = this.registry.get('defenseBoost') || 1;
-        this.registry.set('defenseBoost', currentDefense * GAME_CONFIG.ITEMS.DEFENSE_BOOST.multiplier);
-        this.showItemPickupText('Verteidigung +25%!', item.x, item.y);
+      }
+      case 'defense': {
+        const cur = (this.registry.get('defenseBoost') as number) || 1;
+        this.registry.set('defenseBoost', cur * GAME_CONFIG.ITEMS.DEFENSE_BOOST.multiplier);
+        this.showPickupText('Abwehr ↑', item.x, item.y, '#66aaff');
         this.time.delayedCall(GAME_CONFIG.ITEMS.DEFENSE_BOOST.duration, () => {
           this.registry.set('defenseBoost', 1);
         });
         break;
-
-      case 'life':
-        const currentLives = this.registry.get('lives') || 3;
-        this.registry.set('lives', currentLives + 1);
-        this.showItemPickupText('+1 Leben!', item.x, item.y);
-        this.events.emit('livesUpdated', currentLives + 1);
+      }
+      case 'life': {
+        const lives = (this.registry.get('lives') as number) || 3;
+        this.registry.set('lives', lives + 1);
+        this.showPickupText('+1 Leben! ⭐', item.x, item.y, '#FFD700');
+        this.events.emit('livesUpdated', lives + 1);
         break;
+      }
     }
 
-    // Destroy the item
     item.destroy();
   }
 
-  private showItemPickupText(message: string, x: number, y: number): void {
+  private showPickupText(message: string, x: number, y: number, color: string = '#ffffff'): void {
     const text = this.add.text(x, y, message, {
-      fontSize: '16px',
-      color: '#ffffff',
+      fontSize: '15px',
+      color,
       stroke: '#000000',
       strokeThickness: 3,
-    });
-    text.setOrigin(0.5);
+    }).setOrigin(0.5);
 
     this.tweens.add({
-      targets: text,
-      y: y - 50,
-      alpha: 0,
+      targets:  text,
+      y:        y - 55,
+      alpha:    0,
       duration: 1000,
-      onComplete: () => text.destroy(),
+      onComplete: () => { text.destroy(); },
     });
   }
 
+  // ── Death / respawn ──────────────────────────────────────────────────────────
+
   private handlePlayerDeath(): void {
-    const lives = this.registry.get('lives') || 3;
+    const lives = (this.registry.get('lives') as number) || 3;
 
     if (lives > 1) {
-      // Respawn
       this.registry.set('lives', lives - 1);
-      this.registry.set('health', GAME_CONFIG.PLAYER.MAX_HEALTH);
       this.events.emit('livesUpdated', lives - 1);
 
-      // Reset player position
-      this.player.setPosition(100, 480);
+      // Respawn at the start with brief invincibility
+      this.player.setPosition(100, 400);
       this.player.heal(GAME_CONFIG.PLAYER.MAX_HEALTH);
+      this.player.setAlpha(0.4);
 
-      // Brief invincibility
-      this.player.setAlpha(0.5);
-      this.time.delayedCall(1000, () => {
-        this.player.setAlpha(1);
-      });
+      this.time.delayedCall(1500, () => { this.player.setAlpha(1); });
     } else {
-      // Game over
-      this.gameOver();
+      this.handleGameOver();
     }
   }
 
-  private gameOver(): void {
-    this.scene.pause();
-    this.scene.launch('GameOverScene');
+  private handleGameOver(): void {
+    // Overlay fixed to the camera (scrollFactor 0 = screen-space)
+    const overlay = this.add.graphics().setScrollFactor(0);
+    overlay.fillStyle(0x000000, 0.85);
+    overlay.fillRect(0, 0, 800, 600);
+
+    this.add.text(400, 230, 'Kein Leben mehr...', {
+      fontSize: '38px',
+      color: '#ff4444',
+      stroke: '#000000',
+      strokeThickness: 6,
+    }).setScrollFactor(0).setOrigin(0.5);
+
+    this.add.text(400, 295, 'Gut gespielt, versuch es nochmal!', {
+      fontSize: '22px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setScrollFactor(0).setOrigin(0.5);
+
+    const score = (this.registry.get('score') as number) || 0;
+    this.add.text(400, 340, `Deine Punkte: ${score}`, {
+      fontSize: '20px',
+      color: '#cccccc',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setScrollFactor(0).setOrigin(0.5);
+
+    // Automatically return to menu after 3.5 seconds
+    this.time.delayedCall(3500, () => {
+      this.scene.stop('UIScene');
+      this.scene.start('MenuScene');
+    });
   }
 
-  update(): void {
-    // Parallax background
-    this.background.tilePositionX = this.cameras.main.scrollX * 0.3;
+  // ── Level complete ───────────────────────────────────────────────────────────
 
-    // Update player
+  private handleLevelComplete(): void {
+    if (this.levelComplete) return;
+    this.levelComplete = true;
+
+    // Freeze the player in place
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
+    playerBody.setVelocity(0, 0);
+    playerBody.setAllowGravity(false);
+
+    // Animate the goal flag to its pressed state
+    if (this.anims.exists('end-pressed-anim')) {
+      this.goalSprite.setTexture('end-pressed');
+      this.goalSprite.play('end-pressed-anim');
+    }
+
+    // Camera flourish
+    this.cameras.main.shake(600, 0.006);
+
+    // Screen overlay (screen-space so it covers regardless of scroll)
+    const overlay = this.add.graphics().setScrollFactor(0);
+    overlay.fillStyle(0x000000, 0.75);
+    overlay.fillRect(0, 0, 800, 600);
+
+    const playerName = (this.registry.get('playerName') as string) || 'Held';
+    this.add.text(400, 200, '🎉 LEVEL GESCHAFFT! 🎉', {
+      fontSize: '34px',
+      color: '#FFD700',
+      stroke: '#000000',
+      strokeThickness: 5,
+    }).setScrollFactor(0).setOrigin(0.5);
+
+    this.add.text(400, 260, `Super gemacht, ${playerName}!`, {
+      fontSize: '26px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setScrollFactor(0).setOrigin(0.5);
+
+    const score = (this.registry.get('score') as number) || 0;
+    this.add.text(400, 310, `Punkte: ${score} ⭐`, {
+      fontSize: '22px',
+      color: '#ffe066',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setScrollFactor(0).setOrigin(0.5);
+
+    this.add.text(400, 360, 'Weiter zum Hauptmenü...', {
+      fontSize: '16px',
+      color: '#aaaaaa',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setScrollFactor(0).setOrigin(0.5);
+
+    // Return to menu after 4.5 seconds
+    this.time.delayedCall(4500, () => {
+      this.scene.stop('UIScene');
+      this.scene.start('MenuScene');
+    });
+  }
+
+  // ── Update loop ──────────────────────────────────────────────────────────────
+
+  update(): void {
+    // Slow parallax scroll on the tiled background
+    this.background.tilePositionX = this.cameras.main.scrollX * 0.25;
+
+    if (this.levelComplete) return;
+
     this.player.update();
 
-    // Update regular enemies
-    this.enemies.getChildren().forEach((enemy) => {
+    this.enemies.getChildren().forEach(enemy => {
       const e = enemy as Enemy | PlantEnemy;
       if (e instanceof PlantEnemy) {
         e.update(this.player.x, this.player.y);
