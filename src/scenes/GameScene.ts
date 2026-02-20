@@ -49,8 +49,8 @@ export class GameScene extends Phaser.Scene {
     this.plantEnemies  = [];
 
     // ── World & camera setup ─────────────────────────────────────────────────
-    this.physics.world.setBounds(0, 0, 2500, 600);
-    this.cameras.main.setBounds(0, 0, 2500, 600);
+    this.physics.world.setBounds(0, 0, 2700, 600);
+    this.cameras.main.setBounds(0, 0, 2700, 600);
 
     // Scrolling background (parallax later in update)
     this.background = this.add.tileSprite(0, 0, 800, 600, 'bg-green');
@@ -72,7 +72,7 @@ export class GameScene extends Phaser.Scene {
     // ── Goal (end flag) ──────────────────────────────────────────────────────
     // Place flag so its visual bottom rests on the ground (tile top ≈ 542).
     // end-idle is 64×64; at scale 2 → 128×128; center y = 542 − 64 = 478.
-    this.goalSprite = this.physics.add.staticSprite(2420, 478, 'end-idle');
+    this.goalSprite = this.physics.add.staticSprite(2480, 478, 'end-idle');
     this.goalSprite.setScale(2);
     this.goalSprite.refreshBody();
 
@@ -93,13 +93,15 @@ export class GameScene extends Phaser.Scene {
     this.platforms = this.physics.add.staticGroup();
 
     // Full-width grass ground (y = 550, spans entire level)
-    for (let x = 0; x < 2500; x += 16) {
+    // Ground has a GAP at the required chimney (x: 1374–1486) — forces wall jump
+    for (let x = 0; x < 2700; x += 16) {
+      if (x + 8 >= 1374 && x + 8 <= 1486) continue; // gap under required chimney
       const t = this.platforms.create(x + 8, 550, 'terrain', GameScene.TILE_GRASS) as Phaser.Physics.Arcade.Sprite;
       t.refreshBody();
     }
 
     // Decorative dirt rows below ground (no physics, just visual depth)
-    for (let x = 0; x < 2500; x += 16) {
+    for (let x = 0; x < 2700; x += 16) {
       this.add.image(x + 8, 566, 'terrain', GameScene.TILE_DIRT);
       this.add.image(x + 8, 582, 'terrain', GameScene.TILE_DIRT);
     }
@@ -116,29 +118,37 @@ export class GameScene extends Phaser.Scene {
     this.createPlatform(880, 424, 5);   // mid-staircase, radish here
     this.createPlatform(1030, 368, 4);  // top of staircase, apple reward
 
-    // ── Zone 3 walls (x: 1100 – 1300): the chimney ──────────────────────────
-    //    Two vertical walls players can use for wall-jumping.
-    //    Wall tile bottom at y=468 → tile bottom edge = 476.
-    //    Player body top when walking at ground = 486 → walls don't block passage!
-    //    The ground below is clear; the chimney is purely optional.
-    this.createChimneyWall(1158, 268, 460);  // left wall  (center x=1158)
-    this.createChimneyWall(1254, 268, 460);  // right wall (center x=1254)
-    //    Gap between inner wall edges: (1254-8) − (1158+8) = 1246 − 1166 = 80 px
-    //    Platform at the top — spans both walls so a wall-jumping player lands safely.
-    this.createPlatform(1128, 228, 10); // 160 px wide: x 1136–1296
+    // ── Zone 3a (x: 1100–1300): OPTIONAL chimney — teaser ───────────────────
+    //    Walls stop above ground → player CAN walk under.
+    //    Floating strawberry lures them in; melon waits on top as a reward.
+    //    The hint text says "↑ Wandsprung?" to make them curious.
+    this.createChimneyWall(1158, 268, 460);  // left wall  (bottom tile at y=468)
+    this.createChimneyWall(1254, 268, 460);  // right wall (gap inner = 80 px)
+    this.createPlatform(1128, 228, 10);      // top reward platform (160 px wide)
 
-    // ── Zone 4 platforms (x: 1400 – 1900): plant territory ──────────────────
-    //    Plant enemy sits on the elevated platform and shoots at the player.
-    //    Smaller platforms around it force careful movement.
-    this.createPlatform(1440, 488, 4);  // recovery after chimney
-    this.createPlatform(1580, 448, 5);  // medium, plant here
-    this.createPlatform(1750, 392, 4);  // high, radish here
+    // ── Zone 3b (x: 1350–1550): REQUIRED chimney — mandatory wall jump ───────
+    //    Walls extend all the way to the ground (y=550) → player cannot pass
+    //    underneath.  A wide landing platform before gives time to read the hint.
+    //    Gap between walls (inner): (1478-8) − (1382+8) = 1470-1390 = 80 px
+    //    Player needs 2 wall-jumps to reach the top platform.
+    this.createPlatform(1280, 510, 5);       // safe landing / reading spot before chimney
+    this.createChimneyWall(1382, 260, 542);  // left wall — all the way to ground
+    this.createChimneyWall(1478, 260, 542);  // right wall — all the way to ground
+    this.createPlatform(1350, 220, 10);      // top exit platform (160 px wide)
+    //    A drop-down platform on the right side lets player descend after clearing
+    this.createPlatform(1560, 400, 4);       // descent step
 
-    // ── Zone 5 platforms (x: 1900 – 2500): the final rush ───────────────────
-    //    Mix of all enemy types, stepping platform variety, end flag at x=2420.
-    this.createPlatform(1950, 472, 3);
-    this.createPlatform(2090, 420, 4);  // chicken here
-    this.createPlatform(2260, 472, 3);
+    // ── Zone 4 platforms (x: 1650–2000): plant territory ────────────────────
+    //    Plant enemy on elevated platform + mushroom below.
+    this.createPlatform(1660, 488, 4);       // recovery ground level
+    this.createPlatform(1800, 440, 5);       // plant platform
+    this.createPlatform(1960, 384, 4);       // high platform, radish
+
+    // ── Zone 5 platforms (x: 2050–2500): the final rush ─────────────────────
+    //    All enemy types, varied rhythm, end flag at x=2480.
+    this.createPlatform(2060, 472, 3);
+    this.createPlatform(2200, 416, 4);       // chicken here
+    this.createPlatform(2360, 472, 3);
   }
 
   /**
@@ -194,35 +204,33 @@ export class GameScene extends Phaser.Scene {
     m3.setPatrolDistance(40);
     this.enemies.add(m3);
 
-    // ─ Zone 4: plant + mushroom pairing — player must dodge shots ────────────
-    //   Plant on the elevated platform (y=448), mushroom below on the ground.
-    //   Plant spawn: y = 448 - 40 = 408 (above platform, falls on it).
-    const plant1 = EnemyFactory.createPlant(this, 1614, 408);
+    // ─ Zone 4: plant + mushroom pairing ──────────────────────────────────────
+    //   Plant on elevated platform (y=440), mushroom patrolling ground below.
+    const plant1 = EnemyFactory.createPlant(this, 1832, 400);
     this.plantEnemies.push(plant1);
     this.enemies.add(plant1);
 
-    const m4 = EnemyFactory.createMushroom(this, 1470, 480);
+    const m4 = EnemyFactory.createMushroom(this, 1690, 480);
     m4.setPatrolDistance(30);
     this.enemies.add(m4);
 
-    // Radish on the high platform (y=392): spawn y = 392 - 40 = 352.
-    const r2 = EnemyFactory.createRadish(this, 1778, 352);
+    // Radish on high platform (y=384): spawn y = 384 - 40 = 344.
+    const r2 = EnemyFactory.createRadish(this, 1992, 344);
     r2.setPatrolDistance(25);
     this.enemies.add(r2);
 
     // ─ Zone 5: full mix — the final challenge ────────────────────────────────
-    const m5 = EnemyFactory.createMushroom(this, 1980, 432);
+    const m5 = EnemyFactory.createMushroom(this, 2090, 432);
     m5.setPatrolDistance(20);
     this.enemies.add(m5);
 
-    // Chicken on mid platform (y=420): spawn y = 420 - 40 = 380.
-    // Chicken is a new, slightly faster enemy — exciting reveal before the goal.
-    const c1 = EnemyFactory.createChicken(this, 2122, 380);
+    // Chicken on mid platform (y=416): spawn y = 416 - 40 = 376.
+    const c1 = EnemyFactory.createChicken(this, 2232, 376);
     c1.setPatrolDistance(30);
     this.enemies.add(c1);
 
-    const m6 = EnemyFactory.createMushroom(this, 2300, 480);
-    m6.setPatrolDistance(60);
+    const m6 = EnemyFactory.createMushroom(this, 2400, 480);
+    m6.setPatrolDistance(50);
     this.enemies.add(m6);
   }
 
@@ -241,13 +249,16 @@ export class GameScene extends Phaser.Scene {
     //   Melon waits at the TOP — the grand reward for completing the wall jump
     this.createItem(1204, 186, 'melon',      'life');
 
-    // ─ Zone 4: risky apple near the plant enemy ───────────────────────────────
-    this.createItem(1614, 400, 'apple',      'health');  // near plant (risky grab)
-    this.createItem(1782, 352, 'kiwi',       'defense'); // on high platform
+    // ─ Zone 3b: reward inside required chimney — encourages attempt ──────────
+    this.createItem(1430, 360, 'orange',     'attack');  // mid-chimney, floating
+
+    // ─ Zone 4: risky apple near the plant enemy ──────────────────────────────
+    this.createItem(1832, 392, 'apple',      'health');  // near plant (risky grab)
+    this.createItem(1992, 344, 'kiwi',       'defense'); // on high platform
 
     // ─ Zone 5: final stretch rewards ─────────────────────────────────────────
-    this.createItem(2124, 378, 'orange',     'attack');  // near chicken
-    this.createItem(2380, 480, 'pineapple',  'health');  // right before goal
+    this.createItem(2232, 376, 'banana',     'attack');  // near chicken
+    this.createItem(2450, 480, 'pineapple',  'health');  // right before goal
   }
 
   private createItem(x: number, y: number, sprite: string, type: string): void {
@@ -278,16 +289,24 @@ export class GameScene extends Phaser.Scene {
   // Subtle text hints attached to key spots (scroll with the world).
 
   private addZoneHints(): void {
-    // Chimney entrance hint — disappears after the player moves past
-    this.add.text(1200, 510, '↑ Wandsprung?', {
+    // Optional chimney teaser
+    this.add.text(1206, 510, '↑ Wandsprung?', {
       fontSize: '12px',
       color: '#ffe066',
       stroke: '#000000',
       strokeThickness: 3,
     }).setOrigin(0.5);
 
+    // Required chimney — give the player a clear hint before the wall
+    this.add.text(1330, 490, '⬆ Wandsprung nötig!', {
+      fontSize: '13px',
+      color: '#ff6644',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(0.5);
+
     // Goal marker text
-    this.add.text(2420, 440, '🏁 Ziel!', {
+    this.add.text(2480, 440, '🏁 Ziel!', {
       fontSize: '18px',
       color: '#FFD700',
       stroke: '#000000',
