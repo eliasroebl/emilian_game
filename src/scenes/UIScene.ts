@@ -8,6 +8,9 @@ export class UIScene extends Phaser.Scene {
   private scoreText!: Phaser.GameObjects.Text;
   // Agent 4: coin counter
   private coinText!: Phaser.GameObjects.Text;
+  // Progress bar
+  private progressBar!: Phaser.GameObjects.Graphics;
+  private readonly WORLD_WIDTH = 6000;
 
   constructor() {
     super({ key: 'UIScene' });
@@ -87,7 +90,7 @@ export class UIScene extends Phaser.Scene {
       typeof navigator !== 'undefined' ? navigator.userAgent : ''
     );
     if (!isMobile) {
-      const controlsHint = this.add.text(400, 580, 'Pfeiltasten/WASD: Bewegen | SPACE: Springen | Wand berühren + SPACE: Wandsprung | X: Angriff | C: Ausweichen', {
+      const controlsHint = this.add.text(400, 578, 'Pfeiltasten/WASD: Bewegen | SPACE: Springen | Wand berühren + SPACE: Wandsprung | X: Angriff | C: Ausweichen', {
         fontSize: '11px',
         color: '#cccccc',
         stroke: '#000000',
@@ -96,11 +99,43 @@ export class UIScene extends Phaser.Scene {
       controlsHint.setOrigin(0.5);
     }
 
+    // ── Progress bar (bottom strip) ─────────────────────────────────────────
+    // Dark background strip
+    const progressBg = this.add.graphics();
+    progressBg.fillStyle(0x000000, 0.6);
+    progressBg.fillRect(0, 591, 800, 9);
+    // Green progress bar (starts empty)
+    this.progressBar = this.add.graphics();
+    // Label
+    this.add.text(400, 594, '▶', {
+      fontSize: '8px',
+      color: '#ffffff',
+    }).setOrigin(0.5, 0.5).setAlpha(0.5);
+
     // Fullscreen button (bottom-right corner)
     this.createFullscreenButton();
 
     // Listen for game events
     this.setupEventListeners();
+  }
+
+  update(): void {
+    // Update progress bar from GameScene player position
+    try {
+      const gameScene = this.scene.get('GameScene') as Phaser.Scene & { player?: { x: number } };
+      if (gameScene && gameScene.player) {
+        const px = Math.max(0, Math.min(gameScene.player.x, this.WORLD_WIDTH));
+        const barWidth = (px / this.WORLD_WIDTH) * 800;
+        this.progressBar.clear();
+        this.progressBar.fillStyle(0x44ff44, 1);
+        this.progressBar.fillRect(0, 592, barWidth, 6);
+        // Player position marker
+        this.progressBar.fillStyle(0xffffff, 1);
+        this.progressBar.fillRect(barWidth - 2, 591, 4, 8);
+      }
+    } catch {
+      // GameScene might not be ready yet
+    }
   }
 
   private createFullscreenButton(): void {

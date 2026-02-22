@@ -12,11 +12,11 @@ import type { InputState } from '../input/InputManager';
 //   • Wall jump lock gives a satisfying arc before control is returned
 //   • Variable jump height makes tap = hop, hold = full jump
 // ─────────────────────────────────────────────────────────────────────────────
-const COYOTE_TIME     = 100;  // ms: grace period after leaving floor
-const JUMP_BUFFER     = 150;  // ms: early jump press still registers on landing
-const WALL_SLIDE_SPD  = 80;   // px/s: max fall speed when sliding on a wall
-const WALL_JUMP_PUSH  = 180;  // px/s: horizontal kick-off from wall
-const WALL_JUMP_LOCK  = 200;  // ms: period where player can't override wall-jump velocity
+const COYOTE_TIME     = 140;  // ms: grace period after leaving floor
+const JUMP_BUFFER     = 180;  // ms: early jump press still registers on landing
+const WALL_SLIDE_SPD  = 60;   // px/s: max fall speed when sliding on a wall
+const WALL_JUMP_PUSH  = 220;  // px/s: horizontal kick-off from wall
+const WALL_JUMP_LOCK  = 250;  // ms: period where player can't override wall-jump velocity
 const JUMP_CUT_VEL    = -200; // px/s: velocity cap when jump button released early (small hop)
 
 export class Player extends Phaser.Physics.Arcade.Sprite {

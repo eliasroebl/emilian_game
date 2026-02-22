@@ -2,17 +2,17 @@
 export const GAME_CONFIG = {
   // Player settings
   PLAYER: {
-    SPEED: 220,
-    JUMP_VELOCITY: -520,
+    SPEED: 240,
+    JUMP_VELOCITY: -560,
     DOUBLE_JUMP_VELOCITY: -440,
     DODGE_VELOCITY: 300,
     DODGE_DURATION: 300, // ms
     DODGE_COOLDOWN: 800, // ms
     MAX_HEALTH: 100,
-    ATTACK_DAMAGE: 25,
+    ATTACK_DAMAGE: 30,
     ATTACK_RANGE: 40,
-    ATTACK_COOLDOWN: 400, // ms
-    INVINCIBILITY_DURATION: 1000, // ms after getting hit
+    ATTACK_COOLDOWN: 300, // ms
+    INVINCIBILITY_DURATION: 1500, // ms after getting hit
   },
 
   // World settings

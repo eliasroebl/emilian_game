@@ -158,7 +158,7 @@ export class EnemyFactory {
     return new Enemy(scene, x, y, {
       health: 30,
       damage: 10,
-      speed: 60,
+      speed: 50,
       points: 50,
       spriteKey: 'mushroom-idle',
       animPrefix: 'mushroom',
@@ -170,7 +170,7 @@ export class EnemyFactory {
     return new Enemy(scene, x, y, {
       health: 40,
       damage: 15,
-      speed: 80,
+      speed: 75,
       points: 75,
       spriteKey: 'chicken-idle',
       animPrefix: 'chicken',
@@ -179,12 +179,12 @@ export class EnemyFactory {
   }
 
   static createRino(scene: Phaser.Scene, x: number, y: number): Enemy {
-    // Using Rino as "Mole" placeholder
+    // Using Rino as mini-boss with higher health and speed
     return new Enemy(scene, x, y, {
-      health: 50,
-      damage: 15,
-      speed: 80,
-      points: 100,
+      health: 120,
+      damage: 20,
+      speed: 90,
+      points: 300,
       spriteKey: 'rino-idle',
       animPrefix: 'rino',
       scale: 2,
@@ -195,7 +195,7 @@ export class EnemyFactory {
     return new Enemy(scene, x, y, {
       health: 40,
       damage: 12,
-      speed: 70,
+      speed: 65,
       points: 75,
       spriteKey: 'radish-idle',
       animPrefix: 'radish',
@@ -216,7 +216,7 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
   private isHurt: boolean = false;
   private isDead: boolean = false;
   private shootCooldown: boolean = false;
-  private detectionRange: number = 300;
+  private detectionRange: number = 280;
   private bullets!: Phaser.Physics.Arcade.Group;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
@@ -255,7 +255,7 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
     // Update bullets
     this.bullets.getChildren().forEach((bullet) => {
       const b = bullet as Phaser.Physics.Arcade.Image;
-      if (b.x < 0 || b.x > 2000 || b.y < 0 || b.y > 600) {
+      if (b.x < 0 || b.x > 6200 || b.y < -300 || b.y > 700) {
         b.destroy();
       }
     });
@@ -263,6 +263,9 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
 
   private shoot(targetX: number, targetY: number): void {
     this.shootCooldown = true;
+
+    // Emit warning so GameScene can show "!" indicator
+    this.scene.events.emit('plantWarning', this.x, this.y);
 
     // Play attack animation
     this.play('plant-attack-anim', true);
@@ -298,7 +301,7 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
     });
 
     // Cooldown
-    this.scene.time.delayedCall(2000, () => {
+    this.scene.time.delayedCall(2200, () => {
       this.shootCooldown = false;
     });
   }

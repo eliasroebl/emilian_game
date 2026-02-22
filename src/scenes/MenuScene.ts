@@ -16,7 +16,10 @@ export class MenuScene extends Phaser.Scene {
     // Background
     this.add.tileSprite(0, 0, width * 2, height * 2, 'bg-green');
 
-    // Title
+    // ── Animated background walking enemies ─────────────────────────────────
+    this.spawnMenuEnemies(width, height);
+
+    // ── Title with bob tween ─────────────────────────────────────────────────
     const title = this.add.text(width / 2, 100, 'Krone des Gingers', {
       fontSize: '48px',
       color: '#FFD700',
@@ -25,6 +28,15 @@ export class MenuScene extends Phaser.Scene {
       strokeThickness: 6,
     });
     title.setOrigin(0.5);
+    // Gentle bob animation
+    this.tweens.add({
+      targets: title,
+      y: 92,
+      duration: 1800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
 
     // Subtitle
     const subtitle = this.add.text(width / 2, 160, 'Ein episches Abenteuer', {
@@ -35,8 +47,20 @@ export class MenuScene extends Phaser.Scene {
     });
     subtitle.setOrigin(0.5);
 
+    // ── Highscore display ────────────────────────────────────────────────────
+    const savedHighscore = parseInt(localStorage.getItem('highscore') || '0', 10);
+    if (savedHighscore > 0) {
+      const hsText = this.add.text(width / 2, 198, `🏆 Highscore: ${savedHighscore}`, {
+        fontSize: '18px',
+        color: '#FFD700',
+        stroke: '#000000',
+        strokeThickness: 3,
+      });
+      hsText.setOrigin(0.5);
+    }
+
     // Name input label
-    const nameLabel = this.add.text(width / 2, 250, 'Dein Name:', {
+    const nameLabel = this.add.text(width / 2, 245, 'Dein Name:', {
       fontSize: '24px',
       color: '#ffffff',
       stroke: '#000000',
@@ -45,17 +69,28 @@ export class MenuScene extends Phaser.Scene {
     nameLabel.setOrigin(0.5);
 
     // Create HTML input for name
-    this.createNameInput(width / 2, 290);
+    this.createNameInput(width / 2, 285);
 
-    // Start button
-    const startButton = this.add.rectangle(width / 2, 400, 200, 60, 0x4CAF50);
+    // ── Start button with pulse tween ────────────────────────────────────────
+    const startButton = this.add.rectangle(width / 2, 390, 200, 60, 0x4CAF50);
     startButton.setInteractive({ useHandCursor: true });
 
-    const startText = this.add.text(width / 2, 400, 'Spiel starten', {
+    const startText = this.add.text(width / 2, 390, 'Spiel starten', {
       fontSize: '24px',
       color: '#ffffff',
     });
     startText.setOrigin(0.5);
+
+    // Pulse animation on button + text
+    this.tweens.add({
+      targets: [startButton, startText],
+      scaleX: 1.05,
+      scaleY: 1.05,
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
 
     // Button hover effects
     startButton.on('pointerover', () => {
@@ -75,7 +110,7 @@ export class MenuScene extends Phaser.Scene {
     const controlsStr = isMobile
       ? 'Touch-Steuerung:\n◀ ▶ Bewegen  |  A Springen\n⚔ Angreifen  |  💨 Ausweichen\nWand berühren + A = Wandsprung!'
       : 'Steuerung:\nPfeiltasten / WASD - Bewegen  |  LEERTASTE - Springen\nX - Angreifen  |  C - Ausweichen  |  Wand + LEERTASTE = Wandsprung!';
-    const controlsText = this.add.text(width / 2, 480, controlsStr, {
+    const controlsText = this.add.text(width / 2, 470, controlsStr, {
       fontSize: '16px',
       color: '#ffffff',
       align: 'center',
@@ -84,8 +119,8 @@ export class MenuScene extends Phaser.Scene {
     });
     controlsText.setOrigin(0.5);
 
-    // Touch mode toggle button (y=545, below controls text)
-    this.createTouchToggle(width / 2, 545);
+    // Touch mode toggle button
+    this.createTouchToggle(width / 2, 535);
 
     // Fullscreen button (bottom-right corner)
     this.createFullscreenButton(width, height);
@@ -93,6 +128,39 @@ export class MenuScene extends Phaser.Scene {
     // Allow Enter key to start game
     this.input.keyboard?.on('keydown-ENTER', () => {
       this.startGame();
+    });
+  }
+
+  // ── Animated walking enemies in the background ───────────────────────────────
+
+  private spawnMenuEnemies(width: number, height: number): void {
+    // Spawn 3 enemies that walk across the background at ground level
+    const enemyData = [
+      { key: 'mushroom-idle', anim: 'mushroom-run-anim', startX: -60, y: height - 80, speed: 40, delay: 0 },
+      { key: 'chicken-idle',  anim: 'chicken-run-anim',  startX: -160, y: height - 85, speed: 55, delay: 1200 },
+      { key: 'radish-idle',   anim: 'radish-run-anim',   startX: -100, y: height - 78, speed: 35, delay: 2500 },
+    ];
+
+    enemyData.forEach(({ key, anim, startX, y, speed, delay }) => {
+      this.time.delayedCall(delay, () => {
+        const sprite = this.add.sprite(startX, y, key);
+        sprite.setScale(2);
+        sprite.setAlpha(0.5);
+        sprite.setDepth(0);
+        if (this.anims.exists(anim)) {
+          sprite.play(anim);
+        }
+
+        this.tweens.add({
+          targets: sprite,
+          x: width + 80,
+          duration: (width + 140) / speed * 1000,
+          repeat: -1,
+          onRepeat: () => {
+            sprite.x = startX;
+          },
+        });
+      });
     });
   }
 
