@@ -10,7 +10,7 @@ export class UIScene extends Phaser.Scene {
   private coinText!: Phaser.GameObjects.Text;
   // Progress bar
   private progressBar!: Phaser.GameObjects.Graphics;
-  private readonly WORLD_WIDTH = 6000;
+  private readonly WORLD_WIDTH = 12000;
 
   constructor() {
     super({ key: 'UIScene' });

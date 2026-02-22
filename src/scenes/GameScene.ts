@@ -50,11 +50,11 @@ declare global {
 export class GameScene extends Phaser.Scene {
   public player!: Player;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
-  private enemies!: Phaser.Physics.Arcade.Group;
+  public enemies!: Phaser.Physics.Arcade.Group;
   private plantEnemies: PlantEnemy[] = [];
   private items!: Phaser.Physics.Arcade.Group;
-  private goalSprite!: Phaser.Physics.Arcade.Sprite;
-  private checkpoints!: Phaser.Physics.Arcade.StaticGroup;
+  public goalSprite!: Phaser.Physics.Arcade.Sprite;
+  public checkpoints!: Phaser.Physics.Arcade.StaticGroup;
 
   private background!: Phaser.GameObjects.TileSprite;
   private levelComplete: boolean = false;
@@ -69,7 +69,7 @@ export class GameScene extends Phaser.Scene {
   private lastKilledPos: { x: number; y: number } = { x: 0, y: 0 };
 
   // ── Agent 3: Coins ───────────────────────────────────────────────────────────
-  private totalCoins: number = 0;
+  public totalCoins: number = 0;
 
   // ── Agent 4: Stars & UI ──────────────────────────────────────────────────────
   private livesLost: number = 0;
@@ -77,7 +77,7 @@ export class GameScene extends Phaser.Scene {
 
   // ── VFX: Zone banners ────────────────────────────────────────────────────────
   private announcedZones: Set<number> = new Set();
-  private readonly ZONE_THRESHOLDS = [700, 1400, 2000, 2800, 3600, 4600];
+  private readonly ZONE_THRESHOLDS = [700, 1400, 2000, 2800, 3600, 4600, 6000, 7200, 8400, 9200, 10200, 11200];
   private readonly ZONE_NAMES = [
     '🌿 Zone 1: Wiese',
     '⛰️ Zone 2: Hügelland',
@@ -86,7 +86,16 @@ export class GameScene extends Phaser.Scene {
     '☁️ Zone 5: Himmelsinseln',
     '🌿 Zone 6: Pflanzenfestung',
     '💀 Zone 7: Finales Gauntlet',
+    '🎯 Zone 8: Flipper Allee',
+    '⬇️ Zone 9: Vertikal-Tal',
+    '❄️ Zone 10: Eispalast',
+    '🌲 Zone 11: Finsterer Wald',
+    '🌋 Zone 12: Vulkan-Vorfeld',
+    '🏔️ Zone 13: Gipfelsturm',
   ];
+
+  // ── Bounce platforms ─────────────────────────────────────────────────────────
+  private bouncePlatforms!: Phaser.Physics.Arcade.StaticGroup;
 
   // ── VFX: Landing dust ────────────────────────────────────────────────────────
   private wasOnFloor: boolean = false;
@@ -113,10 +122,11 @@ export class GameScene extends Phaser.Scene {
     this.currentOverlayZone = 0;
     this.zoneOverlays = [];
     this.bossArenaShown = false;
+    this.bouncePlatforms = this.physics.add.staticGroup();
 
     // ── World & camera setup ─────────────────────────────────────────────────
-    this.physics.world.setBounds(0, -300, 6000, 900);
-    this.cameras.main.setBounds(0, -300, 6000, 900);
+    this.physics.world.setBounds(0, -300, 12000, 1100); // extra height for Zone 9 vertical shaft
+    this.cameras.main.setBounds(0, -300, 12000, 1100);
 
     // Scrolling background (parallax later in update)
     this.background = this.add.tileSprite(0, 0, 800, 600, 'bg-green');
@@ -139,12 +149,12 @@ export class GameScene extends Phaser.Scene {
     this.items   = this.physics.add.group();
 
     // ── Goal (end flag) ──────────────────────────────────────────────────────
-    this.goalSprite = this.physics.add.staticSprite(5700, 478, 'end-idle');
+    this.goalSprite = this.physics.add.staticSprite(11800, 268, 'end-idle');
     this.goalSprite.setScale(2);
     this.goalSprite.refreshBody();
 
     // Goal label
-    this.add.text(5700, 440, '🏁 Ziel!', {
+    this.add.text(11800, 230, '🏔️ GIPFEL!', {
       fontSize: '18px',
       color: '#FFD700',
       stroke: '#000000',
@@ -154,7 +164,7 @@ export class GameScene extends Phaser.Scene {
     // ── Checkpoints ──────────────────────────────────────────────────────────
     this.registry.set('lastCheckpoint', { x: 100, y: 480 });
     this.checkpoints = this.physics.add.staticGroup();
-    [1400, 2000, 2800, 3600, 4600].forEach(cx => {
+    [1400, 2000, 2800, 3600, 4600, 6000, 7200, 8400, 9200, 10200, 11000].forEach(cx => {
       const cp = this.checkpoints.create(cx, 510, 'terrain', 0) as Phaser.Physics.Arcade.Sprite;
       cp.setAlpha(0);
       cp.refreshBody();
@@ -199,7 +209,7 @@ export class GameScene extends Phaser.Scene {
   // ── Zone background overlays ─────────────────────────────────────────────────
 
   private createZoneOverlays(): void {
-    // Overlay configs: [color, alpha] for zones 1-7 (index 0-6)
+    // Overlay configs: [color, alpha] for zones 1-13 (index 0-12)
     const overlayConfigs: [number, number][] = [
       [0x000000, 0.0],   // Zone 1: none
       [0x000000, 0.0],   // Zone 2: none
@@ -208,6 +218,12 @@ export class GameScene extends Phaser.Scene {
       [0x88ccff, 0.06],  // Zone 5: light sky blue
       [0x330000, 0.08],  // Zone 6: danger red
       [0x220000, 0.10],  // Zone 7: deep danger
+      [0x000000, 0.0],   // Zone 8: normal (bounce allee)
+      [0x003366, 0.12],  // Zone 9: deep blue (vertical shaft)
+      [0xaaddff, 0.08],  // Zone 10: ice blue
+      [0x001100, 0.14],  // Zone 11: dark forest
+      [0xff3300, 0.10],  // Zone 12: volcano
+      [0xff6600, 0.08],  // Zone 13: summit glow
     ];
 
     overlayConfigs.forEach(([color, alpha]) => {
@@ -233,7 +249,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     // Fade in new overlay (to its target alpha)
-    const configs: number[] = [0, 0, 0.08, 0.10, 0.06, 0.08, 0.10];
+    const configs: number[] = [0, 0, 0.08, 0.10, 0.06, 0.08, 0.10, 0, 0.12, 0.08, 0.14, 0.10, 0.08];
     const targetAlpha = configs[zoneIndex] || 0;
     this.tweens.add({
       targets: nextRect,
@@ -250,15 +266,18 @@ export class GameScene extends Phaser.Scene {
     this.platforms = this.physics.add.staticGroup();
 
     // Ground floor with gap at required chimney (zone 3)
-    for (let x = 0; x < 6000; x += 16) {
+    // Also gap for Zone 9 vertical shaft entrance (x 7210–7490)
+    for (let x = 0; x < 12000; x += 16) {
       // Gap at required chimney zone 3 (x 1614–1726)
       if (x + 8 >= 1614 && x + 8 <= 1726) continue;
+      // Gap for Zone 9 vertical shaft entrance
+      if (x + 8 >= 7220 && x + 8 <= 7480) continue;
       const t = this.platforms.create(x + 8, 550, 'terrain', GameScene.TILE_GRASS) as Phaser.Physics.Arcade.Sprite;
       t.refreshBody();
     }
 
     // Decorative dirt tiles below ground
-    for (let x = 0; x < 6000; x += 16) {
+    for (let x = 0; x < 12000; x += 16) {
       this.add.image(x + 8, 566, 'terrain', GameScene.TILE_DIRT);
       this.add.image(x + 8, 582, 'terrain', GameScene.TILE_DIRT);
     }
@@ -345,10 +364,155 @@ export class GameScene extends Phaser.Scene {
     this.createPlatform(5260, 470, 4);
     this.createPlatform(5380, 420, 5);
     this.createPlatform(5520, 460, 4);
-    this.createPlatform(5640, 490, 5);   // approach to flag
+    this.createPlatform(5640, 490, 5);   // approach to old flag (now just a platform)
     // Elevated drama platforms
     this.createPlatform(5000, 310, 3);
     this.createPlatform(5200, 340, 3);
+
+    // Bridge between Zone 7 and Zone 8
+    this.createPlatform(5850, 490, 6);
+    this.createPlatform(5960, 470, 4);
+
+    // ── Zone 8 — Flipper Allee (6000–7200) — Bouncing Madness ───────────────
+    // Regular platforms
+    this.createPlatform(6050, 490, 3);
+    this.createPlatform(6170, 460, 3);
+    // Bounce launch pad — sends player high
+    this.createBouncePlatform(6280, 490, 3);
+    // High landing platform (reachable via bounce)
+    this.createPlatform(6360, 340, 4);
+    // Back down
+    this.createPlatform(6490, 430, 3);
+    // Regular then another bounce
+    this.createPlatform(6600, 470, 2);
+    this.createBouncePlatform(6660, 490, 2);
+    // Ultra-high secret platform (optional, reachable from bounce)
+    this.createPlatform(6720, 250, 3);
+    // Low path continues
+    this.createPlatform(6790, 490, 3);
+    this.createPlatform(6890, 460, 3);
+    // Final bounce zone leading into Zone 9
+    this.createBouncePlatform(6980, 490, 3);
+    // High platform above the bounce
+    this.createPlatform(7060, 350, 4);
+    this.createPlatform(7130, 480, 3);   // entry ledge to shaft
+
+    // ── Zone 9 — Vertikal-Tal (7200–8400) — Vertical Shaft ──────────────────
+    // Entry ledge before shaft
+    this.createPlatform(7160, 480, 4);
+    // Directional sign platform (text added in addZoneHints)
+    this.createPlatform(7500, 490, 4);   // exit ledge on right side of shaft
+    // Shaft zigzag platforms (descend from y=580 to y=780)
+    this.createPlatform(7220, 590, 3);   // top left
+    this.createPlatform(7350, 630, 3);   // right
+    this.createPlatform(7230, 670, 3);   // left again
+    this.createPlatform(7360, 710, 3);   // right
+    this.createPlatform(7240, 750, 3);   // left
+    this.createPlatform(7380, 780, 4);   // bottom — hidden chamber
+    this.createPlatform(7290, 780, 3);   // wide bottom chamber (connected)
+    // Exit path back up on right side of shaft
+    this.createPlatform(7490, 740, 3);
+    this.createPlatform(7500, 700, 3);
+    this.createPlatform(7510, 660, 3);
+    this.createPlatform(7500, 620, 3);
+    this.createPlatform(7490, 580, 3);
+    // Continue right from shaft exit
+    this.createPlatform(7600, 480, 4);
+    this.createPlatform(7720, 450, 4);
+    this.createPlatform(7840, 420, 3);
+    this.createPlatform(7950, 460, 4);
+    this.createPlatform(8070, 490, 3);
+    this.createPlatform(8180, 430, 4);
+    this.createPlatform(8290, 470, 3);
+
+    // ── Zone 10 — Eispalast (8400–9200) — Ice Spires ────────────────────────
+    // Ground-level chickens path
+    this.createPlatform(8440, 490, 4);
+    this.createPlatform(8560, 490, 3);
+    this.createPlatform(8680, 490, 3);
+    // Ice spires — tall narrow platforms at extreme heights
+    this.createPlatform(8450, 220, 2);   // Spire 1 (very high)
+    this.createPlatform(8580, 250, 2);   // Spire 2
+    this.createPlatform(8710, 210, 2);   // Spire 3 (highest)
+    this.createPlatform(8840, 240, 2);   // Spire 4
+    this.createPlatform(8960, 260, 2);   // Spire 5
+    this.createPlatform(9080, 220, 2);   // Spire 6
+    // Mid-height stepping stones
+    this.createPlatform(8510, 360, 2);
+    this.createPlatform(8640, 340, 2);
+    this.createPlatform(8770, 360, 2);
+    this.createPlatform(8900, 350, 2);
+    // Crystal cave chamber — wide central platform
+    this.createPlatform(8750, 490, 8);   // Crystal chamber floor
+    this.createPlatform(8800, 430, 4);   // Chamber raised area
+    // Exit platforms
+    this.createPlatform(9100, 470, 4);
+    this.createPlatform(9170, 490, 3);
+
+    // ── Zone 11 — Finsterer Wald (9200–10200) — Dark Forest ─────────────────
+    // Regular path
+    this.createPlatform(9250, 490, 4);
+    this.createPlatform(9380, 470, 3);
+    // Low ceiling section (tight corridor — ceiling at y=380, ground at y=550)
+    this.createPlatform(9460, 380, 8);   // CEILING — creates tight corridor
+    this.createPlatform(9480, 490, 6);   // Floor of corridor
+    // After corridor — elevation changes
+    this.createPlatform(9660, 420, 4);
+    this.createPlatform(9780, 390, 3);
+    this.createPlatform(9880, 450, 3);
+    // Second corridor trap
+    this.createPlatform(9960, 380, 6);   // CEILING 2
+    this.createPlatform(9970, 490, 5);   // Floor 2
+    // Final forest platforms
+    this.createPlatform(10080, 460, 4);
+    this.createPlatform(10160, 430, 3);
+    this.createPlatform(10100, 310, 3);  // High platform (secret area hint)
+
+    // ── Zone 12 — Vulkan-Vorfeld (10200–11200) — Volcano Approach ───────────
+    // Progressively narrower platforms (1-2 tile wide)
+    this.createPlatform(10260, 490, 2);
+    this.createPlatform(10330, 460, 2);
+    this.createPlatform(10400, 430, 2);
+    this.createPlatform(10470, 460, 2);
+    this.createPlatform(10540, 490, 1);   // 1-tile!
+    this.createPlatform(10600, 460, 1);   // 1-tile!
+    this.createPlatform(10640, 430, 2);
+    // Wide arena before boss (give player room)
+    this.createPlatform(10660, 490, 20);  // BOSS ARENA — wide fighting platform
+    // Elevated arena platforms for dodging
+    this.createPlatform(10700, 400, 4);
+    this.createPlatform(10820, 400, 4);
+    // Post-boss platforms
+    this.createPlatform(10990, 490, 3);
+    this.createPlatform(11060, 470, 3);
+    this.createPlatform(11150, 490, 4);
+
+    // ── Zone 13 — Gipfelsturm (11200–12000) — Summit ────────────────────────
+    // Alternating high/low platforms (forces constant movement)
+    this.createPlatform(11260, 490, 3);   // low
+    this.createPlatform(11340, 390, 3);   // high
+    this.createPlatform(11420, 480, 2);   // low
+    this.createPlatform(11490, 380, 3);   // high
+    this.createPlatform(11560, 470, 2);   // low
+    // Epic ascending staircase to summit flag
+    this.createPlatform(11620, 460, 2);   // step 1
+    this.createPlatform(11660, 430, 2);   // step 2
+    this.createPlatform(11700, 400, 2);   // step 3
+    this.createPlatform(11740, 370, 2);   // step 4
+    this.createPlatform(11760, 340, 2);   // step 5
+    this.createPlatform(11770, 310, 2);   // step 6
+    this.createPlatform(11780, 285, 4);   // SUMMIT — flag platform (wide enough to land safely)
+  }
+
+  private createBouncePlatform(x: number, y: number, widthTiles: number): void {
+    for (let i = 0; i < widthTiles; i++) {
+      const t = this.bouncePlatforms.create(
+        x + i * 16 + 8, y,
+        'terrain', GameScene.TILE_GRASS,
+      ) as Phaser.Physics.Arcade.Sprite;
+      t.setTint(0xFFAA00); // Yellow/orange tint — visual hint for bounce
+      t.refreshBody();
+    }
   }
 
   private createPlatform(x: number, y: number, widthTiles: number): void {
@@ -489,7 +653,134 @@ export class GameScene extends Phaser.Scene {
     const rino = new RinoBoss(this, 5580, 510);
     this.enemies.add(rino);
 
-    // Total: 2+4+2+5+3+5+6 = 27 enemies (within target)
+    // ─ Zone 8 — Flipper Allee (4 chickens) ───────────────────────────────────
+    const c6 = EnemyFactory.createChicken(this, 6120, 510);
+    c6.setPatrolDistance(60);
+    this.enemies.add(c6);
+
+    const c7 = EnemyFactory.createChicken(this, 6450, 510);
+    c7.setPatrolDistance(50);
+    this.enemies.add(c7);
+
+    const c8 = EnemyFactory.createChicken(this, 6850, 510);
+    c8.setPatrolDistance(55);
+    this.enemies.add(c8);
+
+    const c9 = EnemyFactory.createChicken(this, 7100, 510);
+    c9.setPatrolDistance(40);
+    this.enemies.add(c9);
+
+    // ─ Zone 9 — Vertikal-Tal (2 radishes on shaft platforms + 1 plant at bottom) ──
+    const r6 = EnemyFactory.createRadish(this, 7265, 550);
+    r6.setPatrolDistance(25);
+    this.enemies.add(r6);
+
+    const r7 = EnemyFactory.createRadish(this, 7375, 590);
+    r7.setPatrolDistance(20);
+    this.enemies.add(r7);
+
+    const plant4 = EnemyFactory.createPlant(this, 7340, 740);
+    this.plantEnemies.push(plant4);
+    this.enemies.add(plant4);
+
+    // ─ Zone 10 — Eispalast (2 plants on spires + 2 chickens at ground) ────────
+    const plant5 = EnemyFactory.createPlant(this, 8522, 180);
+    this.plantEnemies.push(plant5);
+    this.enemies.add(plant5);
+
+    const plant6 = EnemyFactory.createPlant(this, 8762, 170);
+    this.plantEnemies.push(plant6);
+    this.enemies.add(plant6);
+
+    const c10 = EnemyFactory.createChicken(this, 8590, 510);
+    c10.setPatrolDistance(55);
+    this.enemies.add(c10);
+
+    const c11 = EnemyFactory.createChicken(this, 8810, 510);
+    c11.setPatrolDistance(55);
+    this.enemies.add(c11);
+
+    // ─ Zone 11 — Finsterer Wald (3 mushrooms + 2 radishes + 2 chickens + 1 plant) ─
+    const m14 = EnemyFactory.createMushroom(this, 9290, 510);
+    m14.setPatrolDistance(55);
+    this.enemies.add(m14);
+
+    const c12 = EnemyFactory.createChicken(this, 9420, 510);
+    c12.setPatrolDistance(50);
+    this.enemies.add(c12);
+
+    // Corridor trap enemies
+    const m15 = EnemyFactory.createMushroom(this, 9520, 510);
+    m15.setPatrolDistance(30);
+    this.enemies.add(m15);
+
+    const r8 = EnemyFactory.createRadish(this, 9570, 510);
+    r8.setPatrolDistance(25);
+    this.enemies.add(r8);
+
+    const c13 = EnemyFactory.createChicken(this, 9710, 510);
+    c13.setPatrolDistance(45);
+    this.enemies.add(c13);
+
+    const r9 = EnemyFactory.createRadish(this, 9830, 410);
+    r9.setPatrolDistance(25);
+    this.enemies.add(r9);
+
+    // Second corridor enemies
+    const m16 = EnemyFactory.createMushroom(this, 10000, 510);
+    m16.setPatrolDistance(30);
+    this.enemies.add(m16);
+
+    const plant7 = EnemyFactory.createPlant(this, 10138, 270);
+    this.plantEnemies.push(plant7);
+    this.enemies.add(plant7);
+
+    // ─ Zone 12 — Vulkan-Vorfeld (2 chickens + 2 radishes + 1 plant + RinoBoss II) ─
+    const c14 = EnemyFactory.createChicken(this, 10310, 510);
+    c14.setPatrolDistance(40);
+    this.enemies.add(c14);
+
+    const r10 = EnemyFactory.createRadish(this, 10430, 440);
+    r10.setPatrolDistance(20);
+    this.enemies.add(r10);
+
+    const c15 = EnemyFactory.createChicken(this, 10570, 510);
+    c15.setPatrolDistance(35);
+    this.enemies.add(c15);
+
+    const r11 = EnemyFactory.createRadish(this, 10660, 460);
+    r11.setPatrolDistance(20);
+    this.enemies.add(r11);
+
+    const plant8 = EnemyFactory.createPlant(this, 10780, 360);
+    this.plantEnemies.push(plant8);
+    this.enemies.add(plant8);
+
+    // 🦏🦏 RINO BOSS II — stronger, 400HP — at x=10840 in the arena
+    const rino2 = new RinoBoss(this, 10840, 450, 400);
+    rino2.setPatrolDistance(100);
+    this.enemies.add(rino2);
+    this.add.text(10840, 400, '⚠️ BOSS II', {
+      fontSize: '13px',
+      color: '#ff4444',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(0.5);
+
+    // ─ Zone 13 — Gipfelsturm (2 chickens + 1 radish) ─────────────────────────
+    const c16 = EnemyFactory.createChicken(this, 11300, 510);
+    c16.setPatrolDistance(40);
+    this.enemies.add(c16);
+
+    const r12 = EnemyFactory.createRadish(this, 11420, 350);
+    r12.setPatrolDistance(20);
+    this.enemies.add(r12);
+
+    const c17 = EnemyFactory.createChicken(this, 11530, 510);
+    c17.setPatrolDistance(35);
+    this.enemies.add(c17);
+
+    // Grand total: 27 (zones 1-7) + 4+3+4+8+6+3 = 28 new = 55 total enemies
   }
 
   // ── Collectible spawning ─────────────────────────────────────────────────────
@@ -531,11 +822,35 @@ export class GameScene extends Phaser.Scene {
       [3720, 490], [3900, 490], [4180, 510], [4500, 510],
       // Zone 7 (5 coins)
       [4720, 510], [4960, 510], [5100, 310], [5390, 490], [5600, 490],
+      // Zone 8 — Flipper Allee (4 coins — on high bounce-accessible platforms)
+      [6360, 305], [6720, 220], [7065, 320], [7180, 450],
+      // Zone 9 — Vertikal-Tal (3 coins in shaft + 1 at bottom)
+      [7235, 600], [7365, 650], [7250, 720], [7325, 760],
+      // Zone 10 — Eispalast (4 coins on spire platforms)
+      [8458, 195], [8650, 225], [8718, 195], [8968, 240],
+      // Zone 11 — Finsterer Wald (4 coins)
+      [9280, 450], [9630, 460], [9790, 360], [10090, 430],
+      // Zone 12 — Vulkan-Vorfeld (3 coins before boss arena)
+      [10320, 460], [10470, 420], [10650, 460],
+      // Zone 13 — Gipfelsturm (2 coins on summit approach)
+      [11350, 460], [11760, 350],
     ];
     coinPositions.forEach(([cx, cy]) => {
       this.createCoin(cx, cy);
     });
     this.totalCoins = coinPositions.length;
+
+    // ── Zone 9 bonus: Star multiplier item at shaft bottom ───────────────────
+    this.createItem(7340, 745, 'banana', 'star');
+
+    // ── Zone 10: Defense boost in crystal cave chamber ───────────────────────
+    this.createItem(8830, 400, 'kiwi', 'defense');
+
+    // ── Zone 12: Star boost before Rino2 arena ───────────────────────────────
+    this.createItem(10610, 400, 'orange', 'star');
+
+    // ── Zone 12: Health pickup in arena (give player a fighting chance) ──────
+    this.createItem(10720, 360, 'cherry', 'health');
   }
 
   private createItem(x: number, y: number, sprite: string, type: string): void {
@@ -613,6 +928,41 @@ export class GameScene extends Phaser.Scene {
     this.add.text(1510, 145, '✨ Geheimbereich!', {
       fontSize: '11px', color: '#ffff88', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5).setAlpha(0.7);
+
+    // Zone 8: bounce platform hint
+    this.add.text(6285, 460, '🟡 Springend!', {
+      fontSize: '12px', color: '#FFD700', stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5);
+
+    // Zone 9: vertical shaft hint
+    this.add.text(7200, 470, '⬇ Tiefer!', {
+      fontSize: '14px', color: '#aaddff', stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5);
+
+    // Zone 9: bottom star hint
+    this.add.text(7330, 755, '⭐ Bonus!', {
+      fontSize: '11px', color: '#FFD700', stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5).setAlpha(0.8);
+
+    // Zone 10: ice spire hint
+    this.add.text(8600, 340, '❄️ Doppelsprung!', {
+      fontSize: '12px', color: '#aaddff', stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5);
+
+    // Zone 11: forest warning
+    this.add.text(9250, 430, '🌲 Vorsicht — dichter Wald!', {
+      fontSize: '12px', color: '#88ff88', stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5);
+
+    // Zone 12: boss warning
+    this.add.text(10620, 450, '🌋 Vulkan-Boss voraus!', {
+      fontSize: '14px', color: '#ff6600', stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5);
+
+    // Zone 13: summit approach
+    this.add.text(11600, 440, '🏔️ Gipfel — fast da!', {
+      fontSize: '14px', color: '#FFD700', stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5);
   }
 
   // ── VFX: Zone transition banner ──────────────────────────────────────────────
@@ -680,8 +1030,18 @@ export class GameScene extends Phaser.Scene {
     // Player ↔ platforms
     this.physics.add.collider(this.player, this.platforms);
 
+    // Player ↔ bounce platforms — launch player upward on land
+    this.physics.add.collider(this.player, this.bouncePlatforms, () => {
+      const pb = this.player.body as Phaser.Physics.Arcade.Body;
+      if (pb.velocity.y >= 0) { // only on downward contact
+        this.player.setVelocityY(-700);
+        this.showPickupText('🎯 BOING!', this.player.x, this.player.y - 20, '#FFD700');
+      }
+    });
+
     // Enemies ↔ platforms
     this.physics.add.collider(this.enemies, this.platforms);
+    this.physics.add.collider(this.enemies, this.bouncePlatforms);
 
     // Player ↔ enemies — unified overlap: stomp takes priority over damage
     this.physics.add.overlap(
@@ -946,6 +1306,20 @@ export class GameScene extends Phaser.Scene {
         this.showPickupText('+10 🪙', item.x, item.y, '#FFD700');
         break;
       }
+      case 'star': {
+        // Instant 5x combo multiplier — lasts 15 seconds
+        this.comboCount = 5;
+        this.showPickupText('⭐ 5x BOOST! 15s', item.x, item.y, '#FFD700');
+        if (this.comboTimer) this.comboTimer.remove();
+        this.comboTimer = this.time.delayedCall(15000, () => {
+          this.comboCount = 0;
+        });
+        // Score bonus
+        const scoreStar = (this.registry.get('score') as number) || 0;
+        this.registry.set('score', scoreStar + 100);
+        this.events.emit('scoreUpdated', scoreStar + 100);
+        break;
+      }
     }
 
     item.destroy();
@@ -1053,8 +1427,14 @@ export class GameScene extends Phaser.Scene {
     overlay.fillRect(0, 0, 800, 600);
 
     const playerName = (this.registry.get('playerName') as string) || 'Held';
-    this.add.text(400, 190, '🎉 LEVEL GESCHAFFT! 🎉', {
-      fontSize: '34px',
+    this.add.text(400, 160, '🏔️ GIPFEL ERREICHT! 🏔️', {
+      fontSize: '28px',
+      color: '#aaddff',
+      stroke: '#000000',
+      strokeThickness: 5,
+    }).setScrollFactor(0).setOrigin(0.5);
+    this.add.text(400, 200, '🎉 LEVEL GESCHAFFT! 🎉', {
+      fontSize: '30px',
       color: '#FFD700',
       stroke: '#000000',
       strokeThickness: 5,

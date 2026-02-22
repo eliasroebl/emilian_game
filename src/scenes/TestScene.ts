@@ -236,6 +236,71 @@ export class TestScene extends Phaser.Scene {
     this.assert('miniboss-stomp-resistance', actualDamage < 100,
       `Stomp 100 dmg dealt ${actualDamage} actual damage (expected <100 due to 0.3× resistance)`);
 
+    this.testLevelExtension(gameScene);
+  }
+
+  private testLevelExtension(gameScene: Phaser.Scene & {
+    player?: Player;
+    enemies?: Phaser.Physics.Arcade.Group;
+    goalSprite?: Phaser.Physics.Arcade.Sprite;
+    checkpoints?: Phaser.Physics.Arcade.StaticGroup;
+    totalCoins?: number;
+  }): void {
+    console.log('[TestScene] Running level extension tests...');
+
+    // ── Test LE-1: World bounds width >= 11000 ────────────────────────────
+    const worldWidth = this.physics.world.bounds.width;
+    this.assert('level-world-width', worldWidth >= 11000,
+      `world.bounds.width=${worldWidth} (expected >= 11000)`);
+
+    // ── Test LE-2: Goal sprite at x >= 11000 ─────────────────────────────
+    const goal = gameScene.goalSprite;
+    if (goal) {
+      this.assert('level-goal-x', goal.x >= 11000,
+        `goalSprite.x=${Math.round(goal.x)} (expected >= 11000)`);
+    } else {
+      this.assert('level-goal-x', false, 'goalSprite not accessible from GameScene');
+    }
+
+    // ── Test LE-3: Total enemies >= 35 ───────────────────────────────────
+    if (gameScene.enemies) {
+      const totalEnemies = gameScene.enemies.getChildren().length;
+      this.assert('level-enemy-count', totalEnemies >= 35,
+        `total enemies=${totalEnemies} (expected >= 35)`);
+    } else {
+      this.assert('level-enemy-count', false, 'enemies group not accessible');
+    }
+
+    // ── Test LE-4: Total coins >= 45 ─────────────────────────────────────
+    const totalCoins = (gameScene as unknown as { totalCoins?: number }).totalCoins ?? 0;
+    this.assert('level-coin-count', totalCoins >= 45,
+      `totalCoins=${totalCoins} (expected >= 45)`);
+
+    // ── Test LE-5: Checkpoint exists at x >= 6000 ────────────────────────
+    const checkpoints = gameScene.checkpoints;
+    let hasLateCheckpoint = false;
+    if (checkpoints) {
+      // Check registry-based approach: check if any cp was at x >= 6000
+      // Checkpoints are destroyed on touch so we check the static group children
+      // or infer from gameState.lastCheckpoint if player already passed one
+      const cpChildren = checkpoints.getChildren();
+      // Also check initial checkpoint positions from existing children
+      for (const cp of cpChildren) {
+        const s = cp as Phaser.Physics.Arcade.Sprite;
+        if (s.x >= 6000) {
+          hasLateCheckpoint = true;
+          break;
+        }
+      }
+      // If player has already activated a late checkpoint, verify via gameState
+      const gs = window.gameState;
+      if (gs && gs.lastCheckpoint && gs.lastCheckpoint.x >= 6000) {
+        hasLateCheckpoint = true;
+      }
+    }
+    this.assert('level-late-checkpoint', hasLateCheckpoint,
+      `Found checkpoint at x >= 6000: ${hasLateCheckpoint}`);
+
     this.finishTests();
   }
 

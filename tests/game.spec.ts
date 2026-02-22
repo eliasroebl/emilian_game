@@ -78,6 +78,58 @@ test.describe('Krone des Gingers - Game Tests', () => {
     expect(gs.levelComplete).toBe(false);
   });
 
+  test('level extension — 12000px world, goal at summit, 35+ enemies, 45+ coins', async ({ page }) => {
+    const logs: string[] = [];
+    page.on('console', msg => {
+      const text = msg.text();
+      logs.push(`[${msg.type()}] ${text}`);
+    });
+    page.on('pageerror', err => console.error('Page error:', err.message));
+
+    await page.goto('http://localhost:5173/emilian_game/?test=1');
+
+    let testResults;
+    try {
+      await page.waitForFunction(
+        () => (window as unknown as { testResults?: { done: boolean } }).testResults?.done === true,
+        { timeout: 60000 },
+      );
+      testResults = await page.evaluate(
+        () => (window as unknown as {
+          testResults: {
+            passed: number;
+            failed: number;
+            tests: Array<{ name: string; passed: boolean; message: string }>;
+          }
+        }).testResults
+      );
+    } catch {
+      console.log('TIMEOUT! Console logs:\n', logs.join('\n'));
+      throw new Error('Level extension test timed out');
+    }
+
+    // Filter level extension tests
+    const levelTests = testResults.tests.filter(t => t.name.startsWith('level-'));
+
+    console.log('\n=== Level Extension Test Results ===');
+    for (const t of levelTests) {
+      console.log(`  ${t.passed ? '✅' : '❌'} ${t.name}: ${t.message}`);
+    }
+
+    const failedLevel = levelTests.filter(t => !t.passed);
+    expect(
+      failedLevel.length,
+      `Failed level tests: ${failedLevel.map(t => `${t.name}: ${t.message}`).join(', ')}`,
+    ).toBe(0);
+
+    // Verify specific level extension properties via gameState
+    const gs = await page.evaluate(
+      () => (window as unknown as { gameState: Record<string, unknown> }).gameState
+    );
+    expect(gs.totalCoins as number).toBeGreaterThanOrEqual(45);
+    expect(gs.enemiesAlive as number).toBeGreaterThanOrEqual(35);
+  });
+
   test('RinoBoss mini-boss — exists, has phases, charge, stomp resistance', async ({ page }) => {
     const logs: string[] = [];
     page.on('console', msg => {

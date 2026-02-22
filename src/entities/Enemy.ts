@@ -255,7 +255,7 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
     // Update bullets
     this.bullets.getChildren().forEach((bullet) => {
       const b = bullet as Phaser.Physics.Arcade.Image;
-      if (b.x < 0 || b.x > 6200 || b.y < -300 || b.y > 700) {
+      if (b.x < 0 || b.x > 12200 || b.y < -300 || b.y > 900) {
         b.destroy();
       }
     });
@@ -366,8 +366,8 @@ type BossState = 'IDLE' | 'PATROL' | 'WIND_UP' | 'CHARGE' | 'RECOVER' | 'GROUND_
 
 export class RinoBoss extends Phaser.Physics.Arcade.Sprite {
   // ── Core stats ─────────────────────────────────────────────────────────────
-  private readonly MAX_HP = 300;
-  private currentHP: number = 300;
+  private readonly MAX_HP: number;
+  private currentHP: number;
   private phase: number = 1;
 
   // Phase-dependent stats
@@ -401,12 +401,14 @@ export class RinoBoss extends Phaser.Physics.Arcade.Sprite {
   // ── Stomp resistance ───────────────────────────────────────────────────────
   private readonly STOMP_MULTIPLIER = 0.3;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, maxHP: number = 300) {
     super(scene, x, y, 'rino-idle');
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
+    this.MAX_HP = maxHP;
+    this.currentHP = maxHP;
     this.startX = x;
 
     // Physics body
@@ -974,5 +976,9 @@ export class RinoBoss extends Phaser.Physics.Arcade.Sprite {
 
   public isEnemyDead(): boolean {
     return this.isDead;
+  }
+
+  public setPatrolDistance(distance: number): void {
+    this.patrolDistance = distance;
   }
 }
