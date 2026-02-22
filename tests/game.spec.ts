@@ -11,7 +11,7 @@ test.describe('Krone des Gingers - Game Tests', () => {
       }
     });
 
-    await page.goto('http://localhost:5173/?test=1');
+    await page.goto('http://localhost:5173/emilian_game/emilian_game/?test=1');
 
     // Wait for test suite to complete (max 45s — game boots + tests run ~10s)
     await page.waitForFunction(
@@ -48,7 +48,7 @@ test.describe('Krone des Gingers - Game Tests', () => {
       }
     });
 
-    await page.goto('http://localhost:5173/?test=1');
+    await page.goto('http://localhost:5173/emilian_game/emilian_game/?test=1');
 
     // Wait for GameScene to boot (TestScene launches it after 1.5s)
     await page.waitForFunction(
