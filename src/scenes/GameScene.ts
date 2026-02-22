@@ -60,8 +60,14 @@ export class GameScene extends Phaser.Scene {
   private levelComplete: boolean = false;
 
   // Terrain tile frames from the 22×11 spritesheet (352×176 px, 16×16 each)
-  private static readonly TILE_GRASS = 96;   // green top tile
-  private static readonly TILE_DIRT  = 118;  // dark soil tile (used for walls)
+  private static readonly TILE_GRASS   = 96;   // green top tile
+  private static readonly TILE_DIRT    = 118;  // dark soil tile (used for walls/platforms)
+  // Layered terrain tiles (from top to bottom)
+  private static readonly TILE_EARTH_TOP  = 7;   // bright green grass top (r0,c7 — rgb 106,135,38)
+  private static readonly TILE_EARTH_MID  = 29;  // brown earth middle     (r1,c7 — rgb 183,108,82)
+  private static readonly TILE_EARTH_DEEP = 95;  // darker earth           (r4,c7 — rgb 185,106,65)
+  private static readonly TILE_EARTH_ROCK = 117; // deep dark earth/rock   (r5,c7 — rgb 158,69,66)
+  // private static readonly TILE_EARTH_BASE = 139; // darkest base rock — reserved for future use
 
   // ── Agent 2: Juice — combo & particles ──────────────────────────────────────
   private comboCount: number = 0;
@@ -276,10 +282,19 @@ export class GameScene extends Phaser.Scene {
       t.refreshBody();
     }
 
-    // Decorative dirt tiles below ground
+    // ── Layered terrain below ground — gives the Earth level depth ──────────
+    // y=550 = grass collision layer (already created above)
+    // y=566 = earth top (bright green/brown transition)
+    // y=582 = earth middle (brown dirt)
+    // y=598 = deep earth (darker brown)
+    // y=614 = rock base (darkest — implies bedrock below)
     for (let x = 0; x < 12000; x += 16) {
-      this.add.image(x + 8, 566, 'terrain', GameScene.TILE_DIRT);
-      this.add.image(x + 8, 582, 'terrain', GameScene.TILE_DIRT);
+      // Skip the shaft gap for visual continuity
+      if (x + 8 >= 7220 && x + 8 <= 7480) continue;
+      this.add.image(x + 8, 566, 'terrain', GameScene.TILE_EARTH_TOP).setDepth(-1);
+      this.add.image(x + 8, 582, 'terrain', GameScene.TILE_EARTH_MID).setDepth(-1);
+      this.add.image(x + 8, 598, 'terrain', GameScene.TILE_EARTH_DEEP).setDepth(-1);
+      this.add.image(x + 8, 614, 'terrain', GameScene.TILE_EARTH_ROCK).setDepth(-1);
     }
 
     // ── Zone 1 — Tutorial Meadow (0–700) ────────────────────────────────────
