@@ -3,8 +3,8 @@ export const GAME_CONFIG = {
   // Player settings
   PLAYER: {
     SPEED: 240,
-    JUMP_VELOCITY: -560,
-    DOUBLE_JUMP_VELOCITY: -440,
+    JUMP_VELOCITY: -480,
+    DOUBLE_JUMP_VELOCITY: -380,
     DODGE_VELOCITY: 300,
     DODGE_DURATION: 300, // ms
     DODGE_COOLDOWN: 800, // ms
