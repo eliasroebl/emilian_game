@@ -16,12 +16,18 @@
         width: 100%;
         height: 100%;
         overscroll-behavior: none;
-        touch-action: none;
+        /* NOTE: touch-action must NOT be 'none' on the body — that blocks Phaser touch events.
+           We only prevent scroll/zoom, but allow pointer events through. */
+        touch-action: pan-x pan-y;
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
         background-color: #1a1a2e;
         overflow: hidden;
+      }
+      /* The game canvas itself handles its own touch — allow all pointer events */
+      canvas {
+        touch-action: none;
       }
       body {
         display: flex;
@@ -76,7 +82,7 @@
         #game-container { display: none; }
       }
     </style>
-    <script type="module" crossorigin src="/emilian_game/assets/index-SjqnC5zD.js"></script>
+    <script type="module" crossorigin src="/emilian_game/assets/index-Cc5nFO4U.js"></script>
   </head>
   <body>
     <!-- Shown on mobile portrait — asks user to rotate -->
