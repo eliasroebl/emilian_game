@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { isTouchDevice } from '../input/InputManager';
 
 export class MenuScene extends Phaser.Scene {
   private playerName: string = '';
@@ -86,9 +87,72 @@ export class MenuScene extends Phaser.Scene {
     );
     controlsText.setOrigin(0.5);
 
+    // Touch mode toggle button (y=545, below controls text)
+    this.createTouchToggle(width / 2, 545);
+
+    // Fullscreen button (bottom-right corner)
+    this.createFullscreenButton(width, height);
+
     // Allow Enter key to start game
     this.input.keyboard?.on('keydown-ENTER', () => {
       this.startGame();
+    });
+  }
+
+  private createTouchToggle(x: number, y: number): void {
+    // Determine initial state: hardware detection OR localStorage override
+    const autoDetected = isTouchDevice();
+    const localStored = localStorage.getItem('touchMode') === '1';
+    const initialActive = autoDetected || localStored;
+
+    // Set registry
+    this.registry.set('forceTouchMode', initialActive);
+
+    const getLabel = (active: boolean) =>
+      active ? '📱 Touch-Modus: AN' : '📱 Touch-Modus: AUS';
+    const getColor = (active: boolean) =>
+      active ? '#00cc44' : '#888888';
+
+    const btn = this.add.text(x, y, getLabel(initialActive), {
+      fontSize: '18px',
+      color: getColor(initialActive),
+      stroke: '#000000',
+      strokeThickness: 2,
+      backgroundColor: '#00000066',
+      padding: { x: 12, y: 6 },
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+    btn.on('pointerover', () => btn.setAlpha(0.85));
+    btn.on('pointerout', () => btn.setAlpha(1));
+
+    btn.on('pointerdown', () => {
+      const current = this.registry.get('forceTouchMode') === true;
+      const next = !current;
+      this.registry.set('forceTouchMode', next);
+      localStorage.setItem('touchMode', next ? '1' : '0');
+      btn.setText(getLabel(next));
+      btn.setStyle({ color: getColor(next) });
+    });
+  }
+
+  private createFullscreenButton(width: number, height: number): void {
+    const btn = this.add.text(width - 16, height - 16, '⛶', {
+      fontSize: '28px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(1, 1).setScrollFactor(0).setInteractive({ useHandCursor: true }).setAlpha(0.7);
+
+    btn.on('pointerover', () => btn.setAlpha(1));
+    btn.on('pointerout', () => btn.setAlpha(0.7));
+    btn.on('pointerdown', () => {
+      if (this.scale.isFullscreen) {
+        this.scale.stopFullscreen();
+        btn.setText('⛶');
+      } else {
+        this.scale.startFullscreen();
+        btn.setText('✕');
+      }
     });
   }
 

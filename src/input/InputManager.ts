@@ -1,5 +1,18 @@
 import Phaser from 'phaser';
 
+/**
+ * Returns true if the current device is (or should be treated as) a touch device.
+ * Checks hardware signals plus the manual localStorage override.
+ */
+export function isTouchDevice(): boolean {
+  return (
+    'ontouchstart' in window ||
+    navigator.maxTouchPoints > 0 ||
+    window.matchMedia('(pointer: coarse)').matches ||
+    localStorage.getItem('touchMode') === '1'
+  );
+}
+
 export interface InputState {
   left: boolean;
   right: boolean;
@@ -19,7 +32,7 @@ export class InputManager {
   private prevTouchState: TouchState = { left: false, right: false, jump: false, attack: false, dodge: false };
 
   constructor(_scene: Phaser.Scene) {
-    this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    this.isMobile = isTouchDevice();
   }
 
   public isMobileDevice(): boolean {

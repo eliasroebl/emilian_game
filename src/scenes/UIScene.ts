@@ -79,8 +79,35 @@ export class UIScene extends Phaser.Scene {
     });
     controlsHint.setOrigin(0.5);
 
+    // Fullscreen button (bottom-right corner)
+    this.createFullscreenButton();
+
     // Listen for game events
     this.setupEventListeners();
+  }
+
+  private createFullscreenButton(): void {
+    const width = this.cameras.main.width;
+    const height = this.cameras.main.height;
+
+    const btn = this.add.text(width - 16, height - 16, '⛶', {
+      fontSize: '28px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(1, 1).setScrollFactor(0).setInteractive({ useHandCursor: true }).setAlpha(0.7);
+
+    btn.on('pointerover', () => btn.setAlpha(1));
+    btn.on('pointerout', () => btn.setAlpha(0.7));
+    btn.on('pointerdown', () => {
+      if (this.scale.isFullscreen) {
+        this.scale.stopFullscreen();
+        btn.setText('⛶');
+      } else {
+        this.scale.startFullscreen();
+        btn.setText('✕');
+      }
+    });
   }
 
   private setupEventListeners(): void {

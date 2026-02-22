@@ -24,6 +24,7 @@ import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { Enemy, EnemyFactory, PlantEnemy } from '../entities/Enemy';
 import { GAME_CONFIG } from '../config/GameConfig';
+import { isTouchDevice } from '../input/InputManager';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -88,7 +89,7 @@ export class GameScene extends Phaser.Scene {
 
     // ── Mobile: init touch registry + launch virtual controls overlay ────────
     this.registry.set('touchInput', { left: false, right: false, jump: false, attack: false, dodge: false });
-    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isMobile = isTouchDevice() || this.registry.get('forceTouchMode') === true;
     if (isMobile) {
       this.scene.launch('VirtualControlsScene');
     }

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { isTouchDevice } from '../input/InputManager';
 
 type TouchKey = 'left' | 'right' | 'jump' | 'attack' | 'dodge';
 
@@ -26,7 +27,7 @@ export class VirtualControlsScene extends Phaser.Scene {
   }
 
   create(): void {
-    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isMobile = isTouchDevice() || this.registry.get('forceTouchMode') === true;
     if (!isMobile) return;
 
     // Ensure registry key exists
