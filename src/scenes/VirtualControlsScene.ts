@@ -35,6 +35,13 @@ export class VirtualControlsScene extends Phaser.Scene {
       this.registry.set('touchInput', { left: false, right: false, jump: false, attack: false, dodge: false });
     }
 
+    // Allow this scene to receive input even when running in parallel with GameScene.
+    // setTopOnly(false) means ALL scenes receive the same pointer events (not just topmost).
+    this.input.setTopOnly(false);
+
+    // Enable multi-touch
+    this.input.addPointer(3);
+
     for (const cfg of BUTTONS) {
       this.createButton(cfg);
     }
@@ -43,52 +50,47 @@ export class VirtualControlsScene extends Phaser.Scene {
   private createButton(cfg: ButtonConfig): void {
     const { key, x, y, radius, alpha, color, label } = cfg;
 
-    // Container — positioned at (x, y) in camera space
-    const container = this.add.container(x, y);
-    container.setScrollFactor(0);
-    container.setAlpha(alpha);
-    container.setDepth(100);
-
-    // Background circle
+    // Draw the visual (graphics + text) — NOT interactive themselves
     const gfx = this.add.graphics();
+    gfx.setScrollFactor(0);
+    gfx.setDepth(100);
+    gfx.setAlpha(alpha);
     gfx.fillStyle(color, 1);
-    gfx.fillCircle(0, 0, radius);
+    gfx.fillCircle(x, y, radius);
     gfx.lineStyle(3, 0xffffff, 0.6);
-    gfx.strokeCircle(0, 0, radius);
+    gfx.strokeCircle(x, y, radius);
 
-    // Label text
-    const txt = this.add.text(0, 0, label, {
+    const txt = this.add.text(x, y, label, {
       fontSize: `${Math.round(radius * 0.65)}px`,
       color: '#ffffff',
-    }).setOrigin(0.5, 0.5);
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(101).setAlpha(alpha);
 
-    container.add([gfx, txt]);
-
-    // Make interactive using circle hit area
-    container.setSize(radius * 2, radius * 2);
-    container.setInteractive(
-      new Phaser.Geom.Circle(0, 0, radius),
-      Phaser.Geom.Circle.Contains,
-    );
+    // Invisible Zone as the actual hit target — much more reliable than Container
+    const zone = this.add.zone(x, y, radius * 2, radius * 2);
+    zone.setScrollFactor(0);
+    zone.setDepth(102);
+    zone.setInteractive({ useHandCursor: false });
 
     const setKey = (val: boolean) => {
       const current = (this.registry.get('touchInput') as Record<string, boolean>) || {};
       this.registry.set('touchInput', { ...current, [key]: val });
     };
 
-    container.on('pointerdown', () => {
+    zone.on('pointerdown', () => {
       setKey(true);
-      container.setAlpha(Math.min(alpha + 0.25, 1.0));
-      container.setScale(0.92);
+      gfx.setAlpha(Math.min(alpha + 0.3, 1.0));
+      txt.setAlpha(1.0);
+      txt.setScale(0.9);
     });
 
     const release = () => {
       setKey(false);
-      container.setAlpha(alpha);
-      container.setScale(1.0);
+      gfx.setAlpha(alpha);
+      txt.setAlpha(alpha);
+      txt.setScale(1.0);
     };
 
-    container.on('pointerup', release);
-    container.on('pointerout', release);
+    zone.on('pointerup', release);
+    zone.on('pointerout', release);
   }
 }
