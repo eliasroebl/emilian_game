@@ -13,29 +13,78 @@
         box-sizing: border-box;
       }
       html, body {
+        width: 100%;
+        height: 100%;
         overscroll-behavior: none;
         touch-action: none;
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
+        background-color: #1a1a2e;
+        overflow: hidden;
       }
       body {
-        background-color: #1a1a2e;
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 100vh;
-        overflow: hidden;
+        min-height: 100dvh;
       }
       #game-container {
         border: 4px solid #4a4a6a;
         border-radius: 8px;
         box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
       }
+      /* On mobile: remove decorative border, fill screen */
+      @media (pointer: coarse) {
+        #game-container {
+          border: none;
+          border-radius: 0;
+          box-shadow: none;
+        }
+      }
+
+      /* ── Rotate overlay ─────────────────────────────────────────── */
+      #rotate-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: #1a1a2e;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+      }
+      #rotate-overlay .icon {
+        font-size: 72px;
+        animation: spin 1.5s ease-in-out infinite alternate;
+      }
+      #rotate-overlay p {
+        color: #ffffff;
+        font-size: 20px;
+        font-family: sans-serif;
+        text-align: center;
+        padding: 0 32px;
+      }
+      @keyframes spin {
+        from { transform: rotate(-20deg); }
+        to   { transform: rotate(20deg); }
+      }
+      /* Show overlay only on touch devices in portrait */
+      @media (pointer: coarse) and (orientation: portrait) {
+        #rotate-overlay { display: flex; }
+        #game-container { display: none; }
+      }
     </style>
     <script type="module" crossorigin src="/emilian_game/assets/index-SjqnC5zD.js"></script>
   </head>
   <body>
+    <!-- Shown on mobile portrait — asks user to rotate -->
+    <div id="rotate-overlay">
+      <div class="icon">📱➡️🎮</div>
+      <p>Bitte drehe dein Gerät<br>ins <strong>Querformat</strong> für das Spiel!</p>
+    </div>
+
     <div id="game-container"></div>
   </body>
 </html>
