@@ -660,22 +660,7 @@ export class GameScene extends Phaser.Scene {
     // Enemies ↔ platforms
     this.physics.add.collider(this.enemies, this.platforms);
 
-    // Player ↔ enemies — damage overlap
-    this.physics.add.overlap(
-      this.player,
-      this.enemies,
-      (playerObj, enemyObj) => {
-        const p = playerObj as Player;
-        const e = enemyObj as Enemy | PlantEnemy;
-        if (!e.isEnemyDead() && !p.isPlayerInvincible()) {
-          // Agent 2: screen shake on player damage
-          this.cameras.main.shake(200, 0.008);
-          p.takeDamage(e.getDamage());
-        }
-      },
-    );
-
-    // Stomp detection — separate overlap
+    // Player ↔ enemies — unified overlap: stomp takes priority over damage
     this.physics.add.overlap(
       this.player,
       this.enemies,
@@ -683,13 +668,22 @@ export class GameScene extends Phaser.Scene {
         const p = playerObj as Player;
         const e = enemyObj as Enemy | PlantEnemy;
         if (e.isEnemyDead()) return;
+
         const pBody = p.body as Phaser.Physics.Arcade.Body;
-        // Stomp = player falling down AND player bottom above enemy center
-        if (pBody.velocity.y > 50 && (p.y + 28) < (e.y - 10)) {
+
+        // Stomp check: player falling (vy > 50) AND player's feet above enemy center
+        const isStomp = pBody.velocity.y > 50 && (p.y + 28) < (e.y - 4);
+
+        if (isStomp) {
+          // Stomp wins — kill enemy, bounce player up
           this.lastKilledPos = { x: e.x, y: e.y };
           e.takeDamage(999);
-          p.setVelocityY(-350);
+          p.setVelocityY(-480); // strong upward bounce
           this.showPickupText('STOMP! 💥', e.x, e.y - 40, '#FFD700');
+        } else if (!p.isPlayerInvincible()) {
+          // Side/frontal collision — deal damage
+          this.cameras.main.shake(200, 0.008);
+          p.takeDamage(e.getDamage());
         }
       },
     );
