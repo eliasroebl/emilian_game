@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_CONFIG } from '../config/GameConfig';
 import { InputManager } from '../input/InputManager';
 import type { InputState } from '../input/InputManager';
+import { soundFX } from '../audio/SoundFX';
 
 // ─── Feel Constants ────────────────────────────────────────────────────────────
 //
@@ -56,6 +57,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private isDodging: boolean = false;
   private canDodge: boolean = true;
   private dodgeDirection: number = 1;
+  private dodgeAfterimageTimer: number = 0;
 
   // ── Health / invincibility ─────────────────────────────────────────────────
   private isInvincible: boolean = false;
@@ -119,6 +121,22 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     // 3. Dodge takes full control of horizontal velocity.
     if (this.isDodging) {
+      // Afterimage every 50ms
+      if (this.scene.time.now - this.dodgeAfterimageTimer > 50) {
+        this.dodgeAfterimageTimer = this.scene.time.now;
+        const ghost = this.scene.add.image(this.x, this.y, this.texture.key, this.frame.name);
+        ghost.setScale(this.scaleX, this.scaleY);
+        ghost.setFlipX(this.flipX);
+        ghost.setAlpha(0.45);
+        ghost.setTint(0x88aaff);
+        ghost.setDepth(this.depth - 1);
+        this.scene.tweens.add({
+          targets: ghost,
+          alpha: 0,
+          duration: 200,
+          onComplete: () => { ghost.destroy(); },
+        });
+      }
       this.setVelocityX(this.dodgeDirection * GAME_CONFIG.PLAYER.DODGE_VELOCITY);
       this.updateAnimations();
       return;
@@ -223,6 +241,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (onFloor || coyoteOpen) {
       // ── Normal (or coyote) jump ──────────────────────────────────────────
       this.setVelocityY(GAME_CONFIG.PLAYER.JUMP_VELOCITY);
+      soundFX.jump();
       this.jumpBufferTimer = 0;   // consume the buffer
       this.lastOnFloor     = 0;   // close coyote window
       this.canDoubleJump   = true;
@@ -249,6 +268,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     } else if (this.canDoubleJump && !this.hasDoubleJumped) {
       // ── Double jump ──────────────────────────────────────────────────────
       this.setVelocityY(GAME_CONFIG.PLAYER.DOUBLE_JUMP_VELOCITY);
+      soundFX.jump();
       this.hasDoubleJumped = true;
       this.canDoubleJump   = false;
       this.jumpBufferTimer  = 0;

@@ -23,6 +23,7 @@ import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { Enemy, EnemyFactory, PlantEnemy } from '../entities/Enemy';
 import { GAME_CONFIG } from '../config/GameConfig';
+import { soundFX } from '../audio/SoundFX';
 // isTouchDevice used indirectly via VirtualControlsScene
 
 export class GameScene extends Phaser.Scene {
@@ -679,11 +680,13 @@ export class GameScene extends Phaser.Scene {
           this.lastKilledPos = { x: e.x, y: e.y };
           e.takeDamage(999);
           p.setVelocityY(-480); // strong upward bounce
+          soundFX.stomp();
           this.showPickupText('STOMP! 💥', e.x, e.y - 40, '#FFD700');
         } else if (!p.isPlayerInvincible()) {
           // Side/frontal collision — deal damage
           this.cameras.main.shake(200, 0.008);
           p.takeDamage(e.getDamage());
+          soundFX.hit();
         }
       },
     );
@@ -730,6 +733,7 @@ export class GameScene extends Phaser.Scene {
         const last = (this.registry.get('lastCheckpoint') as { x: number; y: number }) || { x: 100, y: 480 };
         if (last.x !== cp.x) {
           this.registry.set('lastCheckpoint', { x: cp.x, y: 480 });
+          soundFX.checkpoint();
           this.showPickupText('✅ Checkpoint!', cp.x, 460, '#44ff44');
           cp.destroy();
         }
@@ -756,6 +760,15 @@ export class GameScene extends Phaser.Scene {
     this.events.on('enemyKilled', (points: number) => {
       // Screen shake
       this.cameras.main.shake(100, 0.004);
+
+      // Zoom punch — quick scale-in and back
+      this.cameras.main.zoomTo(1.06, 80, 'Linear', true, (_cam: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+        if (progress === 1) {
+          this.cameras.main.zoomTo(1.0, 120, 'Linear', true);
+        }
+      });
+
+      soundFX.kill();
 
       // Death particles
       this.spawnDeathParticles(this.lastKilledPos.x, this.lastKilledPos.y, 0xFFAA00);
@@ -876,6 +889,7 @@ export class GameScene extends Phaser.Scene {
         this.registry.set('score', scoreNow + 10);
         this.events.emit('scoreUpdated', scoreNow + 10);
         this.events.emit('coinCollected', collected, this.totalCoins);
+        soundFX.coin();
         this.showPickupText('+10 🪙', item.x, item.y, '#FFD700');
         break;
       }
@@ -962,6 +976,7 @@ export class GameScene extends Phaser.Scene {
   private handleLevelComplete(): void {
     if (this.levelComplete) return;
     this.levelComplete = true;
+    soundFX.levelComplete();
 
     const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
     playerBody.setVelocity(0, 0);
