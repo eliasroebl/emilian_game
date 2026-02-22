@@ -249,7 +249,9 @@ export class TestScene extends Phaser.Scene {
     console.log('[TestScene] Running level extension tests...');
 
     // ── Test LE-1: World bounds width >= 11000 ────────────────────────────
-    const worldWidth = this.physics.world.bounds.width;
+    // Read world bounds from GameScene's physics world, not TestScene's
+    const gameSceneForBounds = this.scene.get('GameScene') as Phaser.Scene;
+    const worldWidth = (gameSceneForBounds?.physics as Phaser.Physics.Arcade.ArcadePhysics)?.world?.bounds?.width ?? this.physics.world.bounds.width;
     this.assert('level-world-width', worldWidth >= 11000,
       `world.bounds.width=${worldWidth} (expected >= 11000)`);
 
