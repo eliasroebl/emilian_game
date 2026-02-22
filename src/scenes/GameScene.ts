@@ -21,7 +21,7 @@
 
 import Phaser from 'phaser';
 import { Player } from '../entities/Player';
-import { Enemy, EnemyFactory, PlantEnemy } from '../entities/Enemy';
+import { Enemy, EnemyFactory, PlantEnemy, RinoBoss } from '../entities/Enemy';
 import { GAME_CONFIG } from '../config/GameConfig';
 import { soundFX } from '../audio/SoundFX';
 // isTouchDevice used indirectly via VirtualControlsScene
@@ -94,6 +94,7 @@ export class GameScene extends Phaser.Scene {
   // ── VFX: Zone background overlays ───────────────────────────────────────────
   private zoneOverlays: Phaser.GameObjects.Rectangle[] = [];
   private currentOverlayZone: number = 0;
+  private bossArenaShown: boolean = false;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -111,6 +112,7 @@ export class GameScene extends Phaser.Scene {
     this.wasOnFloor = true;
     this.currentOverlayZone = 0;
     this.zoneOverlays = [];
+    this.bossArenaShown = false;
 
     // ── World & camera setup ─────────────────────────────────────────────────
     this.physics.world.setBounds(0, -300, 6000, 900);
@@ -484,17 +486,8 @@ export class GameScene extends Phaser.Scene {
     this.enemies.add(m13);
 
     // 🦏 RINO MINI-BOSS before the flag
-    const rino = EnemyFactory.createRino(this, 5580, 510);
-    rino.setPatrolDistance(80);
+    const rino = new RinoBoss(this, 5580, 510);
     this.enemies.add(rino);
-
-    // Add mini-boss label
-    this.add.text(5580, 460, '⚠️ BOSS', {
-      fontSize: '13px',
-      color: '#ff4444',
-      stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5);
 
     // Total: 2+4+2+5+3+5+6 = 27 enemies (within target)
   }
@@ -696,7 +689,7 @@ export class GameScene extends Phaser.Scene {
       this.enemies,
       (playerObj, enemyObj) => {
         const p = playerObj as Player;
-        const e = enemyObj as Enemy | PlantEnemy;
+        const e = enemyObj as Enemy | PlantEnemy | RinoBoss;
         if (e.isEnemyDead()) return;
 
         const pBody = p.body as Phaser.Physics.Arcade.Body;
@@ -705,9 +698,14 @@ export class GameScene extends Phaser.Scene {
         const isStomp = pBody.velocity.y > 50 && (p.y + 28) < (e.y - 4);
 
         if (isStomp) {
-          // Stomp wins — kill enemy, bounce player up
+          // Stomp wins — kill/damage enemy, bounce player up
           this.lastKilledPos = { x: e.x, y: e.y };
-          e.takeDamage(999);
+          if (e instanceof RinoBoss) {
+            // Boss stomp resistance: pass 'stomp' source so it applies 0.3× multiplier
+            e.takeDamage(60, 'stomp'); // 60 × 0.3 = 18 effective damage per stomp
+          } else {
+            e.takeDamage(999);
+          }
           p.setVelocityY(-480); // strong upward bounce
           soundFX.stomp();
           this.showPickupText('STOMP! 💥', e.x, e.y - 40, '#FFD700');
@@ -777,10 +775,14 @@ export class GameScene extends Phaser.Scene {
     this.events.on('playerAttack', (hitbox: Phaser.GameObjects.Rectangle, damage: number) => {
       const bounds = hitbox.getBounds();
       this.enemies.getChildren().forEach(enemy => {
-        const e = enemy as Enemy | PlantEnemy;
+        const e = enemy as Enemy | PlantEnemy | RinoBoss;
         if (!e.isEnemyDead() && Phaser.Geom.Rectangle.Overlaps(bounds, e.getBounds())) {
           this.lastKilledPos = { x: e.x, y: e.y };
-          e.takeDamage(damage);
+          if (e instanceof RinoBoss) {
+            e.takeDamage(damage, 'attack');
+          } else {
+            (e as Enemy | PlantEnemy).takeDamage(damage);
+          }
         }
       });
     });
@@ -835,6 +837,28 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.events.on('playerDied', () => { this.handlePlayerDeath(); });
+
+    // Boss-specific events
+    this.events.on('bossDeath', (bossX: number, bossY: number) => {
+      // Drop a melon (+1 life) at death position
+      this.createItem(bossX, bossY - 20, 'melon', 'life');
+
+      // Bonus score: 500 extra (on top of enemyKilled 500)
+      const curScore = (this.registry.get('score') as number) || 0;
+      this.registry.set('score', curScore + 500);
+      this.events.emit('scoreUpdated', curScore + 500);
+
+      this.showPickupText('+500 BONUS! 🏆', bossX, bossY - 80, '#FFD700');
+    });
+
+    this.events.on('bossGroundPoundHit', (damage: number) => {
+      if (!this.player.isPlayerInvincible()) {
+        this.cameras.main.shake(250, 0.01);
+        this.player.takeDamage(damage);
+        soundFX.hit();
+        this.showPickupText('💥 GROUND POUND!', this.player.x, this.player.y - 40, '#ff4444');
+      }
+    });
 
     // VFX: Plant warning indicator
     this.events.on('plantWarning', (px: number, py: number) => {
@@ -1122,11 +1146,13 @@ export class GameScene extends Phaser.Scene {
     };
 
     this.enemies.getChildren().forEach(enemy => {
-      const e = enemy as Enemy | PlantEnemy;
-      if (e instanceof PlantEnemy) {
+      const e = enemy as Enemy | PlantEnemy | RinoBoss;
+      if (e instanceof RinoBoss) {
+        e.update(this.player.x, this.player.y);
+      } else if (e instanceof PlantEnemy) {
         e.update(this.player.x, this.player.y);
       } else {
-        e.update();
+        (e as Enemy).update();
       }
     });
 
@@ -1183,6 +1209,13 @@ export class GameScene extends Phaser.Scene {
         this.showZoneBanner(this.ZONE_NAMES[zoneIndex]);
         this.switchZoneOverlay(zoneIndex);
       }
+    }
+
+    // ⚠️ Boss Arena banner at x > 5400
+    if (px > 5400 && !this.bossArenaShown) {
+      this.bossArenaShown = true;
+      this.cameras.main.shake(200, 0.006);
+      this.showZoneBanner('⚠️ BOSS ARENA — Viel Glück!');
     }
   }
 }

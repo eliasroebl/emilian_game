@@ -9,7 +9,7 @@
  */
 import Phaser from 'phaser';
 import { Player } from '../entities/Player';
-import { Enemy } from '../entities/Enemy';
+import { Enemy, RinoBoss } from '../entities/Enemy';
 
 interface TestResult {
   name: string;
@@ -146,8 +146,8 @@ export class TestScene extends Phaser.Scene {
           this.assert('jump-not-on-floor', !jumpGs.onFloor,
             `onFloor=${jumpGs.onFloor}`);
 
-          // Done!
-          this.time.delayedCall(300, () => this.finishTests());
+          // Done with movement tests — run mini-boss tests next
+          this.time.delayedCall(300, () => this.testMiniBoss(gameScene));
         });
       });
     } else {
@@ -155,6 +155,88 @@ export class TestScene extends Phaser.Scene {
         'Could not access GameScene.player');
       this.finishTests();
     }
+  }
+
+  private testMiniBoss(gameScene: Phaser.Scene & {
+    player?: Player;
+    enemies?: Phaser.Physics.Arcade.Group;
+  }): void {
+    console.log('[TestScene] Running mini-boss tests...');
+
+    if (!gameScene.enemies) {
+      this.assert('miniboss-enemies-group', false, 'No enemies group found in GameScene');
+      this.finishTests();
+      return;
+    }
+
+    // Find RinoBoss in enemies group (should be near x=5580)
+    const allEnemies = gameScene.enemies.getChildren();
+    const rinoBoss = allEnemies.find(e => e instanceof RinoBoss) as RinoBoss | undefined;
+
+    // ── Test MB-1: RinoBoss exists in the level ────────────────────────────
+    this.assert('miniboss-exists', !!rinoBoss,
+      rinoBoss ? `Found RinoBoss at x=${Math.round(rinoBoss.x)}` : 'No RinoBoss found in enemies group');
+
+    if (!rinoBoss) {
+      this.finishTests();
+      return;
+    }
+
+    // ── Test MB-2: HP > 100 (boss tier health) ────────────────────────────
+    this.assert('miniboss-hp-high', rinoBoss.getMaxHP() > 100,
+      `maxHP=${rinoBoss.getMaxHP()} (expected >100)`);
+
+    // ── Test MB-3: getPhase() returns 1, 2, or 3 ──────────────────────────
+    const phase = rinoBoss.getPhase();
+    this.assert('miniboss-getphase', phase >= 1 && phase <= 3,
+      `getPhase()=${phase} (expected 1, 2, or 3)`);
+
+    // ── Test MB-4: Boss is larger than normal mushroom (scale >= 2.5) ──────
+    this.assert('miniboss-scale-large', rinoBoss.scaleX >= 2.5,
+      `scaleX=${rinoBoss.scaleX} (expected >= 2.5)`);
+
+    // ── Test MB-5: Phase 1 at full HP ─────────────────────────────────────
+    this.assert('miniboss-phase1-at-start', rinoBoss.getPhase() === 1,
+      `Phase at full HP should be 1, got ${rinoBoss.getPhase()}`);
+
+    // ── Test MB-6: Phase transitions at HP thresholds ─────────────────────
+    // Simulate dropping HP to phase 2 threshold (≤200 = 66% of 300)
+    const maxHP = rinoBoss.getMaxHP();
+    const phase2HP = Math.floor(maxHP * 0.66) + 1; // just above threshold
+    // Force HP to trigger phase 2 (66% threshold = 200 HP for 300 max)
+    // Deal damage to bring it to phase 2 level
+    const damageToPhase2 = rinoBoss.getCurrentHP() - 199;
+    if (damageToPhase2 > 0) {
+      rinoBoss.takeDamage(damageToPhase2, 'test');
+    }
+    void phase2HP; // suppress unused warning
+    this.assert('miniboss-phase2-threshold', rinoBoss.getPhase() === 2,
+      `Phase at 199 HP should be 2, got ${rinoBoss.getPhase()} (currentHP=${rinoBoss.getCurrentHP()})`);
+
+    // Simulate dropping HP to phase 3 threshold (≤100 = 33% of 300)
+    const damageToPhase3 = rinoBoss.getCurrentHP() - 99;
+    if (damageToPhase3 > 0) {
+      rinoBoss.takeDamage(damageToPhase3, 'test');
+    }
+    this.assert('miniboss-phase3-threshold', rinoBoss.getPhase() === 3,
+      `Phase at 99 HP should be 3, got ${rinoBoss.getPhase()} (currentHP=${rinoBoss.getCurrentHP()})`);
+
+    // ── Test MB-7: isCharging() method exists and returns boolean ──────────
+    const charging = rinoBoss.isCharging();
+    this.assert('miniboss-ischarging', typeof charging === 'boolean',
+      `isCharging()=${charging} (expected boolean)`);
+
+    // ── Test MB-8: Stomp does reduced damage (stomp resistance) ───────────
+    // Reset HP to a known value to test stomp multiplier
+    const hpBefore = rinoBoss.getCurrentHP();
+    rinoBoss.takeDamage(100, 'stomp');
+    const hpAfter = rinoBoss.getCurrentHP();
+    const actualDamage = hpBefore - hpAfter;
+    // Stomp multiplier = 0.3, so 100 stomp damage → 30 actual damage
+    this.assert('miniboss-stomp-resistance', actualDamage < 100,
+      `Stomp 100 dmg dealt ${actualDamage} actual damage (expected <100 due to 0.3× resistance)`);
+
+    this.finishTests();
   }
 
   private finishTests(): void {

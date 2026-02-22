@@ -77,4 +77,59 @@ test.describe('Krone des Gingers - Game Tests', () => {
     expect(typeof gs.enemiesAlive).toBe('number');
     expect(gs.levelComplete).toBe(false);
   });
+
+  test('RinoBoss mini-boss — exists, has phases, charge, stomp resistance', async ({ page }) => {
+    const logs: string[] = [];
+    page.on('console', msg => {
+      const text = msg.text();
+      logs.push(`[${msg.type()}] ${text}`);
+    });
+    page.on('pageerror', err => console.error('Page error:', err.message));
+
+    // Use test=1 mode which runs all tests including mini-boss tests
+    await page.goto('http://localhost:5173/emilian_game/?test=1');
+
+    // Wait for full test suite to complete (includes mini-boss tests)
+    let testResults;
+    try {
+      await page.waitForFunction(
+        () => (window as unknown as { testResults?: { done: boolean } }).testResults?.done === true,
+        { timeout: 60000 },
+      );
+      testResults = await page.evaluate(
+        () => (window as unknown as {
+          testResults: {
+            passed: number;
+            failed: number;
+            tests: Array<{ name: string; passed: boolean; message: string }>;
+          }
+        }).testResults
+      );
+    } catch {
+      console.log('TIMEOUT! Console logs:\n', logs.join('\n'));
+      throw new Error('Mini-boss test suite timed out');
+    }
+
+    // Filter only mini-boss tests
+    const bossTetsts = testResults.tests.filter(t => t.name.startsWith('miniboss-'));
+
+    console.log('\n=== Mini-Boss Test Results ===');
+    for (const t of bossTetsts) {
+      console.log(`  ${t.passed ? '✅' : '❌'} ${t.name}: ${t.message}`);
+    }
+
+    // Assert all mini-boss tests passed
+    const failedBoss = bossTetsts.filter(t => !t.passed);
+    expect(
+      failedBoss.length,
+      `Failed mini-boss tests: ${failedBoss.map(t => `${t.name}: ${t.message}`).join(', ')}`,
+    ).toBe(0);
+
+    // Assert boss-specific behaviors
+    const bossExists = bossTetsts.find(t => t.name === 'miniboss-exists');
+    expect(bossExists?.passed, 'RinoBoss should exist in level').toBe(true);
+
+    const bossHP = bossTetsts.find(t => t.name === 'miniboss-hp-high');
+    expect(bossHP?.passed, 'RinoBoss should have HP > 100').toBe(true);
+  });
 });
