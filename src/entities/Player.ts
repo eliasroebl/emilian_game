@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_CONFIG } from '../config/GameConfig';
+import { InputManager } from '../input/InputManager';
+import type { InputState } from '../input/InputManager';
 
 // ─── Feel Constants ────────────────────────────────────────────────────────────
 //
@@ -25,6 +27,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private keyD!: Phaser.Input.Keyboard.Key;
   private keyX!: Phaser.Input.Keyboard.Key;
   private keyC!: Phaser.Input.Keyboard.Key;
+  private inputManager!: InputManager;
+  private inputState!: InputState;
 
   // ── Jump state ─────────────────────────────────────────────────────────────
   private canDoubleJump: boolean = false;
@@ -79,6 +83,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.health = scene.registry.get('health') as number || this.maxHealth;
 
     this.setupInput();
+    this.inputManager = new InputManager(scene);
+    // Provide a safe default so inputState is never undefined before first update()
+    this.inputState = { left: false, right: false, jump: false, jumpHeld: false, attack: false, dodge: false };
     this.play('player-idle-anim');
   }
 
@@ -96,12 +103,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   // ── Main update ─────────────────────────────────────────────────────────────
 
   update(): void {
+    // 0. Refresh unified input state once per frame.
+    this.inputState = this.inputManager.getState(
+      this.cursors, this.keyW, this.keyA, this.keyD, this.keyX, this.keyC, this.scene,
+    );
+
     // 1. Always capture jump press for buffering — even during dodge/attack.
-    if (
-      Phaser.Input.Keyboard.JustDown(this.cursors.space) ||
-      Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
-      Phaser.Input.Keyboard.JustDown(this.keyW)
-    ) {
+    if (this.inputState.jump) {
       this.jumpBufferTimer = this.scene.time.now;
     }
 
@@ -141,8 +149,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // without overriding velocity — but we still update facing direction.
     const inWallJumpLock = now - this.wallJumpTime < WALL_JUMP_LOCK;
 
-    const leftDown  = this.cursors.left.isDown  || this.keyA.isDown;
-    const rightDown = this.cursors.right.isDown || this.keyD.isDown;
+    const leftDown  = this.inputState.left;
+    const rightDown = this.inputState.right;
 
     if (inWallJumpLock) {
       // Let the wall-jump momentum carry; only update the sprite facing.
@@ -260,10 +268,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (body.onFloor()) return;
 
-    const jumpHeld =
-      this.cursors.space.isDown ||
-      this.cursors.up.isDown   ||
-      this.keyW.isDown;
+    const jumpHeld = this.inputState.jumpHeld;
 
     if (!jumpHeld && body.velocity.y < JUMP_CUT_VEL) {
       this.setVelocityY(JUMP_CUT_VEL);
@@ -273,7 +278,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   // ── Attack ──────────────────────────────────────────────────────────────────
 
   private handleAttack(): void {
-    if (Phaser.Input.Keyboard.JustDown(this.keyX) && this.canAttack) {
+    if (this.inputState.attack && this.canAttack) {
       this.performAttack();
     }
   }
@@ -307,7 +312,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   // ── Dodge ───────────────────────────────────────────────────────────────────
 
   private handleDodge(): void {
-    if (Phaser.Input.Keyboard.JustDown(this.keyC) && this.canDodge) {
+    if (this.inputState.dodge && this.canDodge) {
       this.performDodge();
     }
   }

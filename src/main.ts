@@ -4,6 +4,7 @@ import { PreloadScene } from './scenes/PreloadScene';
 import { MenuScene } from './scenes/MenuScene';
 import { GameScene } from './scenes/GameScene';
 import { UIScene } from './scenes/UIScene';
+import { VirtualControlsScene } from './scenes/VirtualControlsScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -11,6 +12,9 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 600,
   parent: 'game-container',
   pixelArt: true,
+  input: {
+    activePointers: 4,
+  },
   physics: {
     default: 'arcade',
     arcade: {
@@ -18,7 +22,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false // Set to true for development
     }
   },
-  scene: [BootScene, PreloadScene, MenuScene, GameScene, UIScene],
+  scene: [BootScene, PreloadScene, MenuScene, GameScene, UIScene, VirtualControlsScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH

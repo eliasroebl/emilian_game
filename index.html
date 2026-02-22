@@ -2,13 +2,22 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen" />
     <title>Krone des Gingers</title>
     <style>
       * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
+      }
+      html, body {
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
       }
       body {
         background-color: #1a1a2e;

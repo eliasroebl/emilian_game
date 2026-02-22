@@ -85,6 +85,13 @@ export class GameScene extends Phaser.Scene {
     // Camera follows player with a comfortable deadzone
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
     this.cameras.main.setDeadzone(120, 80);
+
+    // ── Mobile: init touch registry + launch virtual controls overlay ────────
+    this.registry.set('touchInput', { left: false, right: false, jump: false, attack: false, dodge: false });
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isMobile) {
+      this.scene.launch('VirtualControlsScene');
+    }
   }
 
   // ── Platform construction ────────────────────────────────────────────────────
