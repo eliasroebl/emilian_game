@@ -14,11 +14,11 @@ interface ButtonConfig {
 }
 
 const BUTTONS: ButtonConfig[] = [
-  { key: 'left',   x: 70,  y: 510, radius: 45, alpha: 0.6,  color: 0x334466, label: '◀' },
-  { key: 'right',  x: 180, y: 510, radius: 45, alpha: 0.6,  color: 0x334466, label: '▶' },
-  { key: 'jump',   x: 730, y: 480, radius: 55, alpha: 0.7,  color: 0x225522, label: 'A' },
-  { key: 'attack', x: 625, y: 520, radius: 42, alpha: 0.6,  color: 0x552222, label: '⚔' },
-  { key: 'dodge',  x: 520, y: 535, radius: 36, alpha: 0.55, color: 0x553322, label: '💨' },
+  { key: 'left',   x: 60,  y: 555, radius: 38, alpha: 0.55, color: 0x334466, label: '◀' },
+  { key: 'right',  x: 155, y: 555, radius: 38, alpha: 0.55, color: 0x334466, label: '▶' },
+  { key: 'jump',   x: 745, y: 540, radius: 45, alpha: 0.65, color: 0x225522, label: 'A' },
+  { key: 'attack', x: 650, y: 565, radius: 35, alpha: 0.55, color: 0x552222, label: '⚔' },
+  { key: 'dodge',  x: 555, y: 572, radius: 30, alpha: 0.50, color: 0x553322, label: '💨' },
 ];
 
 export class VirtualControlsScene extends Phaser.Scene {

@@ -50,8 +50,8 @@ export class GameScene extends Phaser.Scene {
     this.plantEnemies  = [];
 
     // ── World & camera setup ─────────────────────────────────────────────────
-    this.physics.world.setBounds(0, 0, 4000, 600);
-    this.cameras.main.setBounds(0, 0, 4000, 600);
+    this.physics.world.setBounds(0, -300, 4000, 900);
+    this.cameras.main.setBounds(0, -300, 4000, 900);
 
     // Scrolling background (parallax later in update)
     this.background = this.add.tileSprite(0, 0, 800, 600, 'bg-green');
@@ -139,7 +139,8 @@ export class GameScene extends Phaser.Scene {
     //    waits on the reward platform above as a life-upgrade.
     this.createChimneyWall(1380, 268, 460);  // left wall  (bottom tile bottom=468)
     this.createChimneyWall(1476, 268, 460);  // right wall (inner gap = 80 px)
-    this.createPlatform(1350, 228, 10);      // reward platform (160 px wide)
+    // Reward platform moved to RIGHT of right wall — no longer acts as a lid
+    this.createPlatform(1492, 228, 8);       // reward platform (128 px, right of chimney)
 
     // ── Zone 3b — REQUIRED Chimney (x: ~1600–1730) ───────────────────────────
     //    Walls reach y=542 (ground level) — player MUST wall-jump to pass.
@@ -148,7 +149,8 @@ export class GameScene extends Phaser.Scene {
     this.createPlatform(1510, 480, 5);       // safe landing/hint-reading spot
     this.createChimneyWall(1622, 260, 542);  // left wall  — reaches ground
     this.createChimneyWall(1718, 260, 542);  // right wall — reaches ground (gap=80)
-    this.createPlatform(1594, 220, 10);      // exit platform (160 px wide)
+    // Exit platform moved to RIGHT of right wall — no longer acts as a lid
+    this.createPlatform(1730, 220, 10);      // exit platform (160 px, right of chimney)
     this.createPlatform(1790, 380, 4);       // descent step after chimney
 
     // ── Zone 4 — Plant Fortress (x: 1900–2800) ───────────────────────────────

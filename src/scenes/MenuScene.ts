@@ -70,21 +70,18 @@ export class MenuScene extends Phaser.Scene {
       this.startGame();
     });
 
-    // Controls info
-    const controlsText = this.add.text(width / 2, 480,
-      'Steuerung:\n' +
-      'Pfeiltasten / WASD - Bewegen\n' +
-      'LEERTASTE - Springen (kurz tippen = kleiner Hopser, halten = hoher Sprung)\n' +
-      'Wand berühren + LEERTASTE - Wandsprung ← NEU!\n' +
-      'X - Angreifen  |  C - Ausweichen',
-      {
-        fontSize: '16px',
-        color: '#ffffff',
-        align: 'center',
-        stroke: '#000000',
-        strokeThickness: 2,
-      }
-    );
+    // Controls info — context-aware for mobile vs desktop
+    const isMobile = isTouchDevice() || localStorage.getItem('touchMode') === '1';
+    const controlsStr = isMobile
+      ? 'Touch-Steuerung:\n◀ ▶ Bewegen  |  A Springen\n⚔ Angreifen  |  💨 Ausweichen\nWand berühren + A = Wandsprung!'
+      : 'Steuerung:\nPfeiltasten / WASD - Bewegen  |  LEERTASTE - Springen\nX - Angreifen  |  C - Ausweichen  |  Wand + LEERTASTE = Wandsprung!';
+    const controlsText = this.add.text(width / 2, 480, controlsStr, {
+      fontSize: '16px',
+      color: '#ffffff',
+      align: 'center',
+      stroke: '#000000',
+      strokeThickness: 2,
+    });
     controlsText.setOrigin(0.5);
 
     // Touch mode toggle button (y=545, below controls text)
