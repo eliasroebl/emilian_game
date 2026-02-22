@@ -24,7 +24,7 @@ import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { Enemy, EnemyFactory, PlantEnemy } from '../entities/Enemy';
 import { GAME_CONFIG } from '../config/GameConfig';
-import { isTouchDevice } from '../input/InputManager';
+// isTouchDevice used indirectly via VirtualControlsScene
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -89,8 +89,10 @@ export class GameScene extends Phaser.Scene {
 
     // ── Mobile: init touch registry + launch virtual controls overlay ────────
     this.registry.set('touchInput', { left: false, right: false, jump: false, attack: false, dodge: false });
-    const isMobile = isTouchDevice() || this.registry.get('forceTouchMode') === true;
-    if (isMobile) {
+    // Always launch VirtualControlsScene — it decides internally whether to show buttons.
+    // This ensures the scene is ready even if isTouchDevice() was false at startup
+    // but forceTouchMode gets enabled later.
+    if (!this.scene.isActive('VirtualControlsScene')) {
       this.scene.launch('VirtualControlsScene');
     }
   }

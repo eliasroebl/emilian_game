@@ -14,11 +14,11 @@ interface ButtonConfig {
 }
 
 const BUTTONS: ButtonConfig[] = [
-  { key: 'left',   x: 70,  y: 510, radius: 45, alpha: 0.55, color: 0x334466, label: '◀' },
-  { key: 'right',  x: 180, y: 510, radius: 45, alpha: 0.55, color: 0x334466, label: '▶' },
-  { key: 'jump',   x: 730, y: 490, radius: 50, alpha: 0.65, color: 0x225522, label: 'A' },
-  { key: 'attack', x: 630, y: 520, radius: 40, alpha: 0.55, color: 0x552222, label: '⚔' },
-  { key: 'dodge',  x: 530, y: 535, radius: 35, alpha: 0.50, color: 0x553322, label: '💨' },
+  { key: 'left',   x: 70,  y: 510, radius: 45, alpha: 0.6,  color: 0x334466, label: '◀' },
+  { key: 'right',  x: 180, y: 510, radius: 45, alpha: 0.6,  color: 0x334466, label: '▶' },
+  { key: 'jump',   x: 730, y: 480, radius: 55, alpha: 0.7,  color: 0x225522, label: 'A' },
+  { key: 'attack', x: 625, y: 520, radius: 42, alpha: 0.6,  color: 0x552222, label: '⚔' },
+  { key: 'dodge',  x: 520, y: 535, radius: 36, alpha: 0.55, color: 0x553322, label: '💨' },
 ];
 
 export class VirtualControlsScene extends Phaser.Scene {
@@ -27,20 +27,17 @@ export class VirtualControlsScene extends Phaser.Scene {
   }
 
   create(): void {
-    const isMobile = isTouchDevice() || this.registry.get('forceTouchMode') === true;
-    if (!isMobile) return;
+    const showControls = isTouchDevice() || this.registry.get('forceTouchMode') === true;
+    if (!showControls) return;
 
     // Ensure registry key exists
-    if (!this.registry.get('touchInput')) {
-      this.registry.set('touchInput', { left: false, right: false, jump: false, attack: false, dodge: false });
-    }
+    this.registry.set('touchInput', {
+      left: false, right: false, jump: false, attack: false, dodge: false,
+    });
 
-    // Allow this scene to receive input even when running in parallel with GameScene.
-    // setTopOnly(false) means ALL scenes receive the same pointer events (not just topmost).
+    // Critical: allow this parallel scene to receive pointer input
     this.input.setTopOnly(false);
-
-    // Enable multi-touch
-    this.input.addPointer(3);
+    this.input.addPointer(3); // support up to 4 simultaneous touches
 
     for (const cfg of BUTTONS) {
       this.createButton(cfg);
@@ -50,47 +47,42 @@ export class VirtualControlsScene extends Phaser.Scene {
   private createButton(cfg: ButtonConfig): void {
     const { key, x, y, radius, alpha, color, label } = cfg;
 
-    // Draw the visual (graphics + text) — NOT interactive themselves
+    // --- Visual layer (graphics + text) ---
     const gfx = this.add.graphics();
-    gfx.setScrollFactor(0);
-    gfx.setDepth(100);
-    gfx.setAlpha(alpha);
-    gfx.fillStyle(color, 1);
-    gfx.fillCircle(x, y, radius);
-    gfx.lineStyle(3, 0xffffff, 0.6);
-    gfx.strokeCircle(x, y, radius);
+    gfx.setScrollFactor(0).setDepth(100);
+
+    const drawButton = (pressed: boolean) => {
+      gfx.clear();
+      gfx.fillStyle(color, pressed ? 1.0 : alpha);
+      gfx.fillCircle(x, y, radius);
+      gfx.lineStyle(pressed ? 4 : 2, 0xffffff, pressed ? 1.0 : 0.6);
+      gfx.strokeCircle(x, y, radius);
+    };
+    drawButton(false);
 
     const txt = this.add.text(x, y, label, {
       fontSize: `${Math.round(radius * 0.65)}px`,
       color: '#ffffff',
-    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(101).setAlpha(alpha);
+      stroke: '#000',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
-    // Invisible Zone as the actual hit target — much more reliable than Container
-    const zone = this.add.zone(x, y, radius * 2, radius * 2);
-    zone.setScrollFactor(0);
-    zone.setDepth(102);
-    zone.setInteractive({ useHandCursor: false });
+    // --- Hit zone (invisible, on top) ---
+    // Use a Rectangle zone — simpler and more reliable than Circle on mobile
+    const zone = this.add.zone(x, y, radius * 2.2, radius * 2.2);
+    zone.setScrollFactor(0).setDepth(102);
+    zone.setInteractive();
 
     const setKey = (val: boolean) => {
-      const current = (this.registry.get('touchInput') as Record<string, boolean>) || {};
-      this.registry.set('touchInput', { ...current, [key]: val });
+      const cur = (this.registry.get('touchInput') as Record<string, boolean>) || {};
+      this.registry.set('touchInput', { ...cur, [key]: val });
+      drawButton(val);
+      txt.setScale(val ? 0.88 : 1.0);
     };
 
-    zone.on('pointerdown', () => {
-      setKey(true);
-      gfx.setAlpha(Math.min(alpha + 0.3, 1.0));
-      txt.setAlpha(1.0);
-      txt.setScale(0.9);
-    });
-
-    const release = () => {
-      setKey(false);
-      gfx.setAlpha(alpha);
-      txt.setAlpha(alpha);
-      txt.setScale(1.0);
-    };
-
-    zone.on('pointerup', release);
-    zone.on('pointerout', release);
+    zone.on('pointerdown',  () => setKey(true));
+    zone.on('pointerup',    () => setKey(false));
+    zone.on('pointerout',   () => setKey(false));
+    zone.on('pointercancel',() => setKey(false));
   }
 }

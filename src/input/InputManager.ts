@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 
 /**
  * Returns true if the current device is (or should be treated as) a touch device.
- * Checks hardware signals plus the manual localStorage override.
  */
 export function isTouchDevice(): boolean {
   return (
@@ -17,7 +16,7 @@ export interface InputState {
   left: boolean;
   right: boolean;
   jump: boolean;       // just-pressed this frame
-  jumpHeld: boolean;   // held down (for variable jump height)
+  jumpHeld: boolean;   // held down
   attack: boolean;     // just-pressed
   dodge: boolean;      // just-pressed
 }
@@ -25,25 +24,17 @@ export interface InputState {
 type TouchState = { left: boolean; right: boolean; jump: boolean; attack: boolean; dodge: boolean };
 
 export class InputManager {
-  private isMobile: boolean;
-
-  // Touch state (set by VirtualControlsScene via registry)
-  private touchState: TouchState = { left: false, right: false, jump: false, attack: false, dodge: false };
+  // Touch state — ALWAYS tracked regardless of isMobile check.
+  // VirtualControlsScene sets registry 'touchInput'; we read it every frame.
+  private touchState: TouchState     = { left: false, right: false, jump: false, attack: false, dodge: false };
   private prevTouchState: TouchState = { left: false, right: false, jump: false, attack: false, dodge: false };
 
-  constructor(_scene: Phaser.Scene) {
-    this.isMobile = isTouchDevice();
-  }
+  constructor(_scene: Phaser.Scene) {}
 
   public isMobileDevice(): boolean {
-    return this.isMobile;
+    return isTouchDevice();
   }
 
-  /**
-   * Called each frame by Player.
-   * Merges keyboard input with any touch input coming from VirtualControlsScene
-   * (stored in the game registry under the key 'touchInput').
-   */
   public getState(
     cursors: Phaser.Types.Input.Keyboard.CursorKeys,
     keyW: Phaser.Input.Keyboard.Key,
@@ -53,13 +44,12 @@ export class InputManager {
     keyC: Phaser.Input.Keyboard.Key,
     scene: Phaser.Scene,
   ): InputState {
-    // Read touch state from registry (set by VirtualControlsScene)
-    if (this.isMobile) {
-      this.prevTouchState = { ...this.touchState };
-      const ts = scene.registry.get('touchInput') as TouchState | undefined;
-      if (ts) {
-        this.touchState = { ...ts };
-      }
+    // ALWAYS read touch state from registry — don't gate on isMobile.
+    // This way even if isTouchDevice() returned false at startup, touch still works.
+    this.prevTouchState = { ...this.touchState };
+    const ts = scene.registry.get('touchInput') as TouchState | undefined;
+    if (ts) {
+      this.touchState = { ...ts };
     }
 
     const leftDown  = cursors.left.isDown  || keyA.isDown  || this.touchState.left;
@@ -68,8 +58,8 @@ export class InputManager {
 
     const jumpJust =
       Phaser.Input.Keyboard.JustDown(cursors.space) ||
-      Phaser.Input.Keyboard.JustDown(cursors.up) ||
-      Phaser.Input.Keyboard.JustDown(keyW) ||
+      Phaser.Input.Keyboard.JustDown(cursors.up)    ||
+      Phaser.Input.Keyboard.JustDown(keyW)           ||
       (this.touchState.jump && !this.prevTouchState.jump);
 
     const attackJust =
@@ -80,17 +70,6 @@ export class InputManager {
       Phaser.Input.Keyboard.JustDown(keyC) ||
       (this.touchState.dodge && !this.prevTouchState.dodge);
 
-    return {
-      left: leftDown,
-      right: rightDown,
-      jump: jumpJust,
-      jumpHeld,
-      attack: attackJust,
-      dodge: dodgeJust,
-    };
-  }
-
-  public updateTouchState(state: Partial<TouchState>): void {
-    this.touchState = { ...this.touchState, ...state };
+    return { left: leftDown, right: rightDown, jump: jumpJust, jumpHeld, attack: attackJust, dodge: dodgeJust };
   }
 }
