@@ -26,6 +26,27 @@ import { GAME_CONFIG } from '../config/GameConfig';
 import { soundFX } from '../audio/SoundFX';
 // isTouchDevice used indirectly via VirtualControlsScene
 
+declare global {
+  interface Window {
+    gameState: {
+      playerX: number;
+      playerY: number;
+      velocityX: number;
+      velocityY: number;
+      health: number;
+      lives: number;
+      score: number;
+      collectedCoins: number;
+      totalCoins: number;
+      enemiesAlive: number;
+      levelComplete: boolean;
+      lastCheckpoint: { x: number; y: number };
+      onFloor: boolean;
+      isWallSliding: boolean;
+    };
+  }
+}
+
 export class GameScene extends Phaser.Scene {
   public player!: Player;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
@@ -163,6 +184,14 @@ export class GameScene extends Phaser.Scene {
     if (!this.scene.isActive('VirtualControlsScene')) {
       this.scene.launch('VirtualControlsScene');
     }
+
+    // ── window.gameState bridge (for automated testing) ───────────────────────
+    window.gameState = {
+      playerX: 0, playerY: 0, velocityX: 0, velocityY: 0,
+      health: 100, lives: 3, score: 0, collectedCoins: 0, totalCoins: 0,
+      enemiesAlive: 0, levelComplete: false,
+      lastCheckpoint: { x: 100, y: 480 }, onFloor: false, isWallSliding: false,
+    };
   }
 
   // ── Zone background overlays ─────────────────────────────────────────────────
@@ -1072,6 +1101,25 @@ export class GameScene extends Phaser.Scene {
     if (this.levelComplete) return;
 
     this.player.update();
+
+    // ── Update window.gameState for automated testing ─────────────────────────
+    const pb = this.player.body as Phaser.Physics.Arcade.Body;
+    window.gameState = {
+      playerX: Math.round(this.player.x),
+      playerY: Math.round(this.player.y),
+      velocityX: Math.round(pb.velocity.x),
+      velocityY: Math.round(pb.velocity.y),
+      health: this.player.getHealth(),
+      lives: (this.registry.get('lives') as number) || 3,
+      score: (this.registry.get('score') as number) || 0,
+      collectedCoins: (this.registry.get('collectedCoins') as number) || 0,
+      totalCoins: this.totalCoins,
+      enemiesAlive: this.enemies.getChildren().filter(e => !(e as Enemy).isEnemyDead()).length,
+      levelComplete: this.levelComplete,
+      lastCheckpoint: (this.registry.get('lastCheckpoint') as { x: number; y: number }) || { x: 100, y: 480 },
+      onFloor: pb.onFloor(),
+      isWallSliding: !pb.onFloor() && (pb.blocked.left || pb.blocked.right) && pb.velocity.y > 0,
+    };
 
     this.enemies.getChildren().forEach(enemy => {
       const e = enemy as Enemy | PlantEnemy;

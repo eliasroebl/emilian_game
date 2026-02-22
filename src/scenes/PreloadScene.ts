@@ -195,7 +195,11 @@ export class PreloadScene extends Phaser.Scene {
 
   create(): void {
     this.createAnimations();
-    this.scene.start('MenuScene');
+    if (this.registry.get('__testMode')) {
+      this.scene.start('TestScene');
+    } else {
+      this.scene.start('MenuScene');
+    }
   }
 
   private createAnimations(): void {

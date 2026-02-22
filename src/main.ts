@@ -5,6 +5,7 @@ import { MenuScene } from './scenes/MenuScene';
 import { GameScene } from './scenes/GameScene';
 import { UIScene } from './scenes/UIScene';
 import { VirtualControlsScene } from './scenes/VirtualControlsScene';
+import { TestScene } from './scenes/TestScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -22,7 +23,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false // Set to true for development
     }
   },
-  scene: [BootScene, PreloadScene, MenuScene, GameScene, UIScene, VirtualControlsScene],
+  scene: [BootScene, PreloadScene, MenuScene, GameScene, UIScene, VirtualControlsScene, TestScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
