@@ -378,14 +378,17 @@ export class GameScene extends Phaser.Scene {
     this.createPlatform(5120, 430, 4);
     this.createPlatform(5260, 470, 4);
     this.createPlatform(5380, 420, 5);
-    this.createPlatform(5520, 460, 4);
-    this.createPlatform(5640, 490, 5);   // approach to old flag (now just a platform)
-    // Elevated drama platforms
+    // ── BOSS ARENA (x=5480–5900) — clear open ground, no platforms inside ──
+    // Approach ledge before arena
+    this.createPlatform(5440, 480, 3);   // small drop-in ledge before arena
+    // Elevated drama platforms (above arena — safe to keep, boss can't reach)
     this.createPlatform(5000, 310, 3);
     this.createPlatform(5200, 340, 3);
+    this.createPlatform(5550, 360, 4);   // high platform above arena (collectible/escape)
+    // Exit platform after arena
+    this.createPlatform(5900, 480, 5);
 
     // Bridge between Zone 7 and Zone 8
-    this.createPlatform(5850, 490, 6);
     this.createPlatform(5960, 470, 4);
 
     // ── Zone 8 — Flipper Allee (6000–7200) — Bouncing Madness ───────────────
@@ -665,7 +668,7 @@ export class GameScene extends Phaser.Scene {
     this.enemies.add(m13);
 
     // 🦏 RINO MINI-BOSS before the flag
-    const rino = new RinoBoss(this, 5580, 510);
+    const rino = new RinoBoss(this, 5700, 510); // center of open boss arena
     this.enemies.add(rino);
 
     // ─ Zone 8 — Flipper Allee (4 chickens) ───────────────────────────────────
@@ -772,7 +775,7 @@ export class GameScene extends Phaser.Scene {
     this.enemies.add(plant8);
 
     // 🦏🦏 RINO BOSS II — stronger, 400HP — at x=10840 in the arena
-    const rino2 = new RinoBoss(this, 10840, 450, 400);
+    const rino2 = new RinoBoss(this, 10800, 450, 400); // center of Zone 12 boss arena (platform y=490 → spawn y=450)
     rino2.setPatrolDistance(100);
     this.enemies.add(rino2);
     this.add.text(10840, 400, '⚠️ BOSS II', {
