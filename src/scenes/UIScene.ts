@@ -6,6 +6,8 @@ export class UIScene extends Phaser.Scene {
   private healthText!: Phaser.GameObjects.Text;
   private livesText!: Phaser.GameObjects.Text;
   private scoreText!: Phaser.GameObjects.Text;
+  // Agent 4: coin counter
+  private coinText!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: 'UIScene' });
@@ -60,6 +62,16 @@ export class UIScene extends Phaser.Scene {
     });
     this.scoreText.setOrigin(1, 0);
 
+    // Agent 4: Coin counter below score
+    const totalCoins = (this.registry.get('totalCoins') as number) || 0;
+    this.coinText = this.add.text(784, 45, `🪙 0/${totalCoins}`, {
+      fontSize: '18px',
+      color: '#FFD700',
+      stroke: '#000000',
+      strokeThickness: 2,
+    });
+    this.coinText.setOrigin(1, 0);
+
     // World name display
     const worldConfig = GAME_CONFIG.WORLDS.EARTH;
     const worldText = this.add.text(400, 16, worldConfig.name, {
@@ -70,14 +82,19 @@ export class UIScene extends Phaser.Scene {
     });
     worldText.setOrigin(0.5, 0);
 
-    // Controls hint (bottom)
-    const controlsHint = this.add.text(400, 580, 'Pfeiltasten/WASD: Bewegen | SPACE: Springen | Wand berühren + SPACE: Wandsprung | X: Angriff | C: Ausweichen', {
-      fontSize: '11px',
-      color: '#cccccc',
-      stroke: '#000000',
-      strokeThickness: 2,
-    });
-    controlsHint.setOrigin(0.5);
+    // Agent 4: Controls hint — hide on mobile/touch devices
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      typeof navigator !== 'undefined' ? navigator.userAgent : ''
+    );
+    if (!isMobile) {
+      const controlsHint = this.add.text(400, 580, 'Pfeiltasten/WASD: Bewegen | SPACE: Springen | Wand berühren + SPACE: Wandsprung | X: Angriff | C: Ausweichen', {
+        fontSize: '11px',
+        color: '#cccccc',
+        stroke: '#000000',
+        strokeThickness: 2,
+      });
+      controlsHint.setOrigin(0.5);
+    }
 
     // Fullscreen button (bottom-right corner)
     this.createFullscreenButton();
@@ -131,6 +148,17 @@ export class UIScene extends Phaser.Scene {
     gameScene.events.on('scoreUpdated', (score: number) => {
       this.updateScore(score);
     });
+
+    // Agent 4: Coin collection updates
+    gameScene.events.on('coinCollected', (collected: number, total: number) => {
+      this.coinText.setText(`🪙 ${collected}/${total}`);
+    });
+
+    // Init coin display when totalCoins is known
+    const totalCoins = (this.registry.get('totalCoins') as number) || 0;
+    if (totalCoins > 0) {
+      this.coinText.setText(`🪙 0/${totalCoins}`);
+    }
   }
 
   private updateHealthBar(health: number, maxHealth: number): void {

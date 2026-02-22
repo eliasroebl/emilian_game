@@ -438,4 +438,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   public getHealth(): number     { return this.health; }
   public getMaxHealth(): number  { return this.maxHealth; }
   public isPlayerInvincible(): boolean { return this.isInvincible; }
+
+  // Agent 4: expose wall-slide state for visual feedback in GameScene
+  public isWallSliding(): boolean {
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    return this.isOnWall && !body.onFloor() && body.velocity.y > 0;
+  }
 }
