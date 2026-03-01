@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { GAME_CONFIG } from '../config/GameConfig';
 
 export interface EnemyConfig {
   health: number;
@@ -166,14 +167,15 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 }
 
-// Specific enemy types factory
+// Specific enemy types factory — stats driven from GAME_CONFIG.ENEMIES
 export class EnemyFactory {
   static createMushroom(scene: Phaser.Scene, x: number, y: number): Enemy {
+    const cfg = GAME_CONFIG.ENEMIES.MUSHROOM;
     return new Enemy(scene, x, y, {
-      health: 30,
-      damage: 10,
-      speed: 50,
-      points: 50,
+      health: cfg.health,
+      damage: cfg.damage,
+      speed: cfg.speed,
+      points: cfg.points,
       spriteKey: 'mushroom-idle',
       animPrefix: 'mushroom',
       scale: 2,
@@ -181,11 +183,12 @@ export class EnemyFactory {
   }
 
   static createChicken(scene: Phaser.Scene, x: number, y: number): Enemy {
+    const cfg = GAME_CONFIG.ENEMIES.CHICKEN;
     return new Enemy(scene, x, y, {
-      health: 40,
-      damage: 15,
-      speed: 75,
-      points: 75,
+      health: cfg.health,
+      damage: cfg.damage,
+      speed: cfg.speed,
+      points: cfg.points,
       spriteKey: 'chicken-idle',
       animPrefix: 'chicken',
       scale: 2,
@@ -193,12 +196,12 @@ export class EnemyFactory {
   }
 
   static createRino(scene: Phaser.Scene, x: number, y: number): Enemy {
-    // Using Rino as mini-boss with higher health and speed
+    const cfg = GAME_CONFIG.ENEMIES.RINO;
     return new Enemy(scene, x, y, {
-      health: 120,
-      damage: 20,
-      speed: 90,
-      points: 300,
+      health: cfg.health,
+      damage: cfg.damage,
+      speed: cfg.speed,
+      points: cfg.points,
       spriteKey: 'rino-idle',
       animPrefix: 'rino',
       scale: 2,
@@ -206,11 +209,12 @@ export class EnemyFactory {
   }
 
   static createRadish(scene: Phaser.Scene, x: number, y: number): Enemy {
+    const cfg = GAME_CONFIG.ENEMIES.RADISH;
     return new Enemy(scene, x, y, {
-      health: 40,
-      damage: 12,
-      speed: 65,
-      points: 75,
+      health: cfg.health,
+      damage: cfg.damage,
+      speed: cfg.speed,
+      points: cfg.points,
       spriteKey: 'radish-idle',
       animPrefix: 'radish',
       scale: 2,
@@ -224,14 +228,14 @@ export class EnemyFactory {
 
 // Special Plant enemy that shoots bullets
 export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
-  private health: number = 60;
-  private damage: number = 15;
-  private points: number = 100;
+  private health: number = GAME_CONFIG.ENEMIES.PLANT.health;
+  private damage: number = GAME_CONFIG.ENEMIES.PLANT.damage;
+  private points: number = GAME_CONFIG.ENEMIES.PLANT.points;
   private isHurt: boolean = false;
   private isDead: boolean = false;
   private hurtTimer: Phaser.Time.TimerEvent | null = null;
   private shootCooldown: boolean = false;
-  private detectionRange: number = 280;
+  private detectionRange: number = GAME_CONFIG.ENEMIES.PLANT.detectionRange;
   private bullets!: Phaser.Physics.Arcade.Group;
   /** Physics collider for bullet↔player overlap, stored so it can be removed on death */
   private bulletCollider: Phaser.Physics.Arcade.Collider | null = null;
@@ -390,7 +394,7 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   public getBulletDamage(): number {
-    return 10;
+    return GAME_CONFIG.ENEMIES.PLANT.bulletDamage;
   }
 
   public setBulletCollider(collider: Phaser.Physics.Arcade.Collider): void {

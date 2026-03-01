@@ -49,6 +49,14 @@ export class PauseScene extends Phaser.Scene {
 
     // ESC to resume
     this.input.keyboard?.on('keydown-ESC', () => this.resumeGame());
+
+    // Clean up on shutdown
+    this.events.on('shutdown', this.handleShutdown, this);
+  }
+
+  private handleShutdown(): void {
+    this.input.keyboard?.off('keydown-ESC');
+    this.events.off('shutdown', this.handleShutdown, this);
   }
 
   private resumeGame(): void {

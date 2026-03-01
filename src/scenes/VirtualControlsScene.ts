@@ -53,6 +53,16 @@ export class VirtualControlsScene extends Phaser.Scene {
     this.createActionButton(BTN_JUMP,   'jump');
     this.createActionButton(BTN_ATTACK, 'attack');
     this.createActionButton(BTN_DODGE,  'dodge');
+
+    // Clean up on shutdown
+    this.events.on('shutdown', this.handleShutdown, this);
+  }
+
+  private handleShutdown(): void {
+    this.input.off('pointermove');
+    this.input.off('pointerup');
+    this.input.off('pointercancel');
+    this.events.off('shutdown', this.handleShutdown, this);
   }
 
   // ── Joystick ───────────────────────────────────────────────────────────────

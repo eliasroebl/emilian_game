@@ -70,6 +70,14 @@ export class GameOverScene extends Phaser.Scene {
 
     // Allow Enter to restart
     this.input.keyboard?.on('keydown-ENTER', () => this.restartGame());
+
+    // Clean up on shutdown
+    this.events.on('shutdown', this.handleShutdown, this);
+  }
+
+  private handleShutdown(): void {
+    this.input.keyboard?.off('keydown-ENTER');
+    this.events.off('shutdown', this.handleShutdown, this);
   }
 
   private restartGame(): void {

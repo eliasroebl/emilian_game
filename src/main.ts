@@ -8,6 +8,7 @@ import { GameOverScene } from './scenes/GameOverScene';
 import { PauseScene } from './scenes/PauseScene';
 import { VirtualControlsScene } from './scenes/VirtualControlsScene';
 import { TestScene } from './scenes/TestScene';
+import { GAME_CONFIG } from './config/GameConfig';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -21,7 +22,7 @@ const config: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'arcade',
     arcade: {
-      gravity: { x: 0, y: 650 },
+      gravity: { x: 0, y: GAME_CONFIG.PHYSICS.GRAVITY },
       debug: false // Set to true for development
     }
   },

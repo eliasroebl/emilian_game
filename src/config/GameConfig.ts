@@ -43,19 +43,38 @@ export const GAME_CONFIG = {
     },
   },
 
-  // Enemy base stats (will be scaled per enemy type)
+  // Enemy base stats per type
   ENEMIES: {
-    MOLE: {
-      health: 50,
-      damage: 15,
-      speed: 80,
-      points: 100,
-    },
     MUSHROOM: {
       health: 30,
       damage: 10,
-      speed: 60,
+      speed: 50,
       points: 50,
+    },
+    CHICKEN: {
+      health: 40,
+      damage: 15,
+      speed: 75,
+      points: 75,
+    },
+    RINO: {
+      health: 120,
+      damage: 20,
+      speed: 90,
+      points: 300,
+    },
+    RADISH: {
+      health: 40,
+      damage: 12,
+      speed: 65,
+      points: 75,
+    },
+    PLANT: {
+      health: 60,
+      damage: 15,
+      bulletDamage: 10,
+      detectionRange: 280,
+      points: 100,
     },
   },
 

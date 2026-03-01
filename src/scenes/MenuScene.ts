@@ -4,6 +4,7 @@ import { isTouchDevice } from '../input/InputManager';
 export class MenuScene extends Phaser.Scene {
   private playerName: string = '';
   private nameInput: HTMLInputElement | null = null;
+  private resizeHandler: (() => void) | null = null;
 
   constructor() {
     super({ key: 'MenuScene' });
@@ -279,7 +280,7 @@ export class MenuScene extends Phaser.Scene {
     this.nameInput.focus();
 
     // Update position on resize
-    this.scale.on('resize', () => {
+    this.resizeHandler = () => {
       if (this.nameInput) {
         const rect = canvas.getBoundingClientRect();
         const sx = rect.width / this.cameras.main.width;
@@ -287,7 +288,8 @@ export class MenuScene extends Phaser.Scene {
         this.nameInput.style.left = `${rect.left + (x - 100) * sx}px`;
         this.nameInput.style.top = `${rect.top + y * sy}px`;
       }
-    });
+    };
+    this.scale.on('resize', this.resizeHandler);
   }
 
   private sanitizeName(raw: string): string {
@@ -321,6 +323,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   shutdown(): void {
+    // Kill all tweens to prevent callbacks firing after scene is gone
+    this.tweens.killAll();
+
+    // Remove resize listener
+    if (this.resizeHandler) {
+      this.scale.off('resize', this.resizeHandler);
+      this.resizeHandler = null;
+    }
+
     // Clean up input element when scene shuts down
     if (this.nameInput) {
       this.nameInput.remove();
