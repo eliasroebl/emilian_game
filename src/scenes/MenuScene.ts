@@ -201,6 +201,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createFullscreenButton(width: number, height: number): void {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isStandalone = ('standalone' in navigator) && (navigator as unknown as { standalone: boolean }).standalone;
+    if (isStandalone) return;
+
     const btn = this.add.text(width - 16, height - 16, '⛶', {
       fontSize: '28px',
       color: '#ffffff',
@@ -211,7 +215,9 @@ export class MenuScene extends Phaser.Scene {
     btn.on('pointerover', () => btn.setAlpha(1));
     btn.on('pointerout', () => btn.setAlpha(0.7));
     btn.on('pointerdown', () => {
-      if (this.scale.isFullscreen) {
+      if (isIOS) {
+        this.showIOSHint(width, height);
+      } else if (this.scale.isFullscreen) {
         this.scale.stopFullscreen();
         btn.setText('⛶');
       } else {
@@ -219,6 +225,25 @@ export class MenuScene extends Phaser.Scene {
         btn.setText('✕');
       }
     });
+  }
+
+  private showIOSHint(w: number, h: number): void {
+    const overlay = this.add.rectangle(w / 2, h / 2, w - 40, 180, 0x000000, 0.88)
+      .setScrollFactor(0).setDepth(300).setInteractive();
+    const text = this.add.text(w / 2, h / 2, [
+      '📱 Vollbild auf iPhone:',
+      '',
+      'Teilen  →  Zum Home-Bildschirm',
+      '',
+      '(Dann als App öffnen → echtes Vollbild)',
+      '',
+      'Tippen zum Schließen',
+    ].join('\n'), {
+      fontSize: '14px', color: '#ffffff', align: 'center', lineSpacing: 4,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+    const close = () => { overlay.destroy(); text.destroy(); };
+    overlay.on('pointerdown', close);
+    this.time.delayedCall(5000, close);
   }
 
   private createNameInput(x: number, y: number): void {

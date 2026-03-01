@@ -1,0 +1,22 @@
+{
+  "name": "Krone des Gingers",
+  "short_name": "Krone des Gingers",
+  "description": "Ein episches Platformer-Abenteuer",
+  "start_url": "/emilian_game/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
