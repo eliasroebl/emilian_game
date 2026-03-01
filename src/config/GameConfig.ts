@@ -1,5 +1,9 @@
 // Game Configuration
 export const GAME_CONFIG = {
+  // World dimensions (used by GameScene, enemies, bullets)
+  WORLD_WIDTH: 2500,
+  WORLD_HEIGHT: 600,
+
   // Player settings
   PLAYER: {
     SPEED: 200,
@@ -72,7 +76,8 @@ export const GAME_CONFIG = {
       duration: 10000, // ms, 0 = permanent
     },
     DEFENSE_BOOST: {
-      multiplier: 0.75, // damage reduction
+      // multiplier applied to incoming damage: 0.75 means player takes 75% damage (25% reduction)
+      multiplier: 0.75,
       duration: 10000,
     },
     EXTRA_LIFE: {

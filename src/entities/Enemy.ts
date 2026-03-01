@@ -12,7 +12,6 @@ export interface EnemyConfig {
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private health: number;
-  private maxHealth: number;
   private damage: number;
   private speed: number;
   private points: number;
@@ -24,6 +23,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   private isHurt: boolean = false;
   private isDead: boolean = false;
+  private hurtTimer: Phaser.Time.TimerEvent | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, config: EnemyConfig) {
     super(scene, x, y, config.spriteKey);
@@ -41,7 +41,6 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setScale(config.scale || 2);
 
     // Store config
-    this.maxHealth = config.health;
     this.health = config.health;
     this.damage = config.damage;
     this.speed = config.speed;
@@ -108,14 +107,24 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     const knockbackDir = this.direction * -1;
     this.setVelocityX(knockbackDir * 100);
 
+    // Cancel previous hurt timer if still pending (prevents stuck state)
+    if (this.hurtTimer) {
+      this.hurtTimer.remove(false);
+    }
+
     // Recover from hurt
-    this.scene.time.delayedCall(300, () => {
+    this.hurtTimer = this.scene.time.delayedCall(300, () => {
       this.isHurt = false;
       this.clearTint();
+      this.hurtTimer = null;
     });
 
     // Check for death
     if (this.health <= 0) {
+      if (this.hurtTimer) {
+        this.hurtTimer.remove(false);
+        this.hurtTimer = null;
+      }
       this.die();
     }
   }
@@ -217,6 +226,7 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
   private points: number = 100;
   private isHurt: boolean = false;
   private isDead: boolean = false;
+  private hurtTimer: Phaser.Time.TimerEvent | null = null;
   private shootCooldown: boolean = false;
   private detectionRange: number = 300;
   private bullets!: Phaser.Physics.Arcade.Group;
@@ -254,10 +264,11 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    // Update bullets
+    // Cull bullets that leave world bounds
+    const bounds = this.scene.physics.world.bounds;
     this.bullets.getChildren().forEach((bullet) => {
       const b = bullet as Phaser.Physics.Arcade.Image;
-      if (b.x < 0 || b.x > 2000 || b.y < 0 || b.y > 600) {
+      if (b.x < bounds.x || b.x > bounds.right || b.y < bounds.y || b.y > bounds.bottom) {
         b.destroy();
       }
     });
@@ -312,12 +323,22 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
     this.isHurt = true;
     this.setTint(0xff0000);
 
-    this.scene.time.delayedCall(300, () => {
+    // Cancel previous hurt timer if still pending
+    if (this.hurtTimer) {
+      this.hurtTimer.remove(false);
+    }
+
+    this.hurtTimer = this.scene.time.delayedCall(300, () => {
       this.isHurt = false;
       this.clearTint();
+      this.hurtTimer = null;
     });
 
     if (this.health <= 0) {
+      if (this.hurtTimer) {
+        this.hurtTimer.remove(false);
+        this.hurtTimer = null;
+      }
       this.die();
     }
   }
