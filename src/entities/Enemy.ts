@@ -130,20 +130,23 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   private die(): void {
+    if (this.isDead) return;
     this.isDead = true;
     this.setVelocityX(0);
-    this.setVelocityY(-200); // Pop up effect
 
     // Disable collision
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.enable = false;
 
-    // Fade out and destroy
+    // Pop up effect — apply velocity BEFORE disabling body won't work,
+    // so use a tween for the visual pop instead
     this.scene.tweens.add({
       targets: this,
+      y: this.y - 30,
       alpha: 0,
       duration: 500,
       onComplete: () => {
+        if (!this.scene) return;
         this.scene.events.emit('enemyKilled', this.points);
         this.destroy();
       }
@@ -230,6 +233,8 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
   private shootCooldown: boolean = false;
   private detectionRange: number = 280;
   private bullets!: Phaser.Physics.Arcade.Group;
+  /** Physics collider for bullet↔player overlap, stored so it can be removed on death */
+  private bulletCollider: Phaser.Physics.Arcade.Collider | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 'plant-idle');
@@ -347,16 +352,24 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   private die(): void {
+    if (this.isDead) return;
     this.isDead = true;
 
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.enable = false;
+
+    // Remove bullet overlap collider IMMEDIATELY to prevent stale physics references
+    if (this.bulletCollider) {
+      this.bulletCollider.destroy();
+      this.bulletCollider = null;
+    }
 
     this.scene.tweens.add({
       targets: this,
       alpha: 0,
       duration: 500,
       onComplete: () => {
+        if (!this.scene) return;
         this.scene.events.emit('enemyKilled', this.points);
         this.bullets.destroy(true);
         this.destroy();
@@ -378,6 +391,10 @@ export class PlantEnemy extends Phaser.Physics.Arcade.Sprite {
 
   public getBulletDamage(): number {
     return 10;
+  }
+
+  public setBulletCollider(collider: Phaser.Physics.Arcade.Collider): void {
+    this.bulletCollider = collider;
   }
 }
 

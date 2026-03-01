@@ -52,6 +52,7 @@ export class GameScene extends Phaser.Scene {
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   public enemies!: Phaser.Physics.Arcade.Group;
   private plantEnemies: PlantEnemy[] = [];
+  private plantBulletColliders: Phaser.Physics.Arcade.Collider[] = [];
   private items!: Phaser.Physics.Arcade.Group;
   private itemTweens: Map<Phaser.Physics.Arcade.Sprite, Phaser.Tweens.Tween> = new Map();
   private boostTimers: Phaser.Time.TimerEvent[] = [];
@@ -166,7 +167,7 @@ export class GameScene extends Phaser.Scene {
     this.player = new Player(this, 100, 480);
 
     // ── Groups ───────────────────────────────────────────────────────────────
-    this.enemies = this.physics.add.group({ runChildUpdate: true });
+    this.enemies = this.physics.add.group();
     this.items   = this.physics.add.group();
 
     // ── Goal (end flag) ──────────────────────────────────────────────────────
@@ -1082,6 +1083,7 @@ export class GameScene extends Phaser.Scene {
       this.player,
       this.enemies,
       (playerObj, enemyObj) => {
+        if (this.isTransitioning) return;
         const p = playerObj as Player;
         const e = enemyObj as Enemy | PlantEnemy | RinoBoss;
         if (e.isEnemyDead()) return;
@@ -1128,9 +1130,10 @@ export class GameScene extends Phaser.Scene {
       () => { this.handleLevelComplete(); },
     );
 
-    // Player ↔ each plant's bullet group
+    // Player ↔ each plant's bullet group (collider stored on plant for cleanup on death)
+    this.plantBulletColliders = [];
     this.plantEnemies.forEach(plant => {
-      this.physics.add.overlap(
+      const collider = this.physics.add.overlap(
         this.player,
         plant.getBullets(),
         (playerObj, bulletObj) => {
@@ -1143,6 +1146,8 @@ export class GameScene extends Phaser.Scene {
           }
         },
       );
+      plant.setBulletCollider(collider);
+      this.plantBulletColliders.push(collider);
     });
 
     // Player ↔ checkpoints
@@ -1526,11 +1531,16 @@ export class GameScene extends Phaser.Scene {
   // ── Shutdown cleanup ─────────────────────────────────────────────────────────
 
   private handleShutdown(): void {
+    this.isTransitioning = true;
     this.tweens.killAll();
     this.itemTweens.clear();
 
     this.boostTimers.forEach(timer => timer.remove(false));
     this.boostTimers = [];
+
+    // Remove plant bullet colliders to prevent stale physics references
+    this.plantBulletColliders.forEach(c => c.destroy());
+    this.plantBulletColliders = [];
 
     this.events.off('playerAttack');
     this.events.off('enemyKilled');
