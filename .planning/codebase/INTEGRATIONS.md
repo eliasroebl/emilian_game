@@ -1,98 +1,139 @@
-# External Integrations
+# INTEGRATIONS.md — External Services & Integrations
 
-**Analysis Date:** 2026-03-01
+## Overview
 
-## APIs & External Services
-
-**Not detected**
-
-This is a client-side game with no external API integrations. All game logic, data, and state are handled locally within the browser.
-
-## Data Storage
-
-**Databases:**
-- None - Game state is stored in Phaser Scene Registry only (in-memory, not persistent)
-
-**File Storage:**
-- Local filesystem only - Asset loading from `/public/assets/`
-
-**Caching:**
-- Browser-based only (standard HTTP caching via Vite/HTTP headers)
-
-## State Management
-
-**Registry (Phaser Scene Registry):**
-- `playerName` - Name entered by player at start
-- `currentWorld` - Currently active world (Erdwelt, Steinwelt, etc.)
-- `lives` - Number of lives remaining
-- `health` - Current player health value
-- `score` - Cumulative score
-- `attackBoost` - Attack multiplier (1 = normal, 1.25 = boosted)
-- `defenseBoost` - Defense multiplier/damage reduction (1 = normal, 0.75 = boosted)
-
-**Event-Driven Communication:**
-- `playerDamaged` - Emitted when player takes damage (GameScene → UIScene)
-- `playerHealed` - Emitted when player heals (GameScene → UIScene)
-- `livesUpdated` - Emitted when lives change (GameScene → UIScene)
-- `scoreUpdated` - Emitted when score increases (GameScene → UIScene)
-- `playerAttack` - Emitted when player performs attack (Player → GameScene)
-- `enemyKilled` - Emitted when enemy is defeated (GameScene → UIScene)
-- `playerDied` - Emitted when player health reaches 0 (Player → GameScene)
-
-## Authentication & Identity
-
-**Auth Provider:**
-- Not applicable - Single-player game with no user authentication
-
-**Player Identification:**
-- Local input only - Player name entered in MenuScene via HTML input
-
-## Monitoring & Observability
-
-**Error Tracking:**
-- None detected
-
-**Logs:**
-- Browser console only (no logging framework)
-
-## CI/CD & Deployment
-
-**Hosting:**
-- Static file hosting capable (no backend required)
-- Single HTML file with bundled assets (`index.html`)
-
-**CI Pipeline:**
-- Not detected - No workflow files present
-
-## Webhooks & Callbacks
-
-**Incoming:**
-- None
-
-**Outgoing:**
-- None
-
-## Asset Loading
-
-**Asset Types Loaded:**
-- Sprite sheets from `/public/assets/` directory
-- PNG image files referenced in `PreloadScene.ts`
-
-**Load Pattern:**
-- Assets preloaded in PreloadScene before MenuScene
-- Images loaded via Phaser's `load.image()` and `load.spritesheet()` APIs
-- Animations created from loaded sprite sheets in PreloadScene
-
-## Game-Specific Dependencies
-
-**Phaser 3 Built-in Systems:**
-- Animation system - Frame-based sprite animations
-- Input system - Keyboard handling (no mouse/touch implemented)
-- Physics system - Arcade Physics with gravity and collisions
-- Timer system - Timed events (attack cooldowns, dodge cooldown, invincibility frames)
-- Tween system - Smooth visual effects (flash effect on damage, fade effects)
-- Event system - Publish/subscribe between scenes
+This project has no external API integrations at runtime. All external integrations are CI/CD focused, using GitHub-native tooling for automated testing and deployment.
 
 ---
 
-*Integration audit: 2026-03-01*
+## CI/CD — GitHub Actions
+
+Workflows live in `.github/workflows/`. Two pipelines are active.
+
+---
+
+### 1. Deploy to GitHub Pages
+
+**File:** `.github/workflows/deploy.yml`
+
+**Trigger:**
+- Push to `dev` branch
+- Manual (`workflow_dispatch`)
+
+**Permissions:** `contents: write` (needed to push to `gh-pages` branch)
+
+**Pipeline steps:**
+
+```
+checkout → setup Node 20 → npm ci → npm run build → deploy to gh-pages
+```
+
+**Deployment target:** `gh-pages` branch, published via `peaceiris/actions-gh-pages@v3`
+
+```yaml
+- name: Deploy to gh-pages branch
+  uses: peaceiris/actions-gh-pages@v3
+  with:
+    github_token: ${{ secrets.GITHUB_TOKEN }}
+    publish_dir: ./dist
+```
+
+**Key details:**
+- Uses `GITHUB_TOKEN` (built-in, no manual secret needed)
+- Publishes `./dist` — the Vite build output
+- Live URL after deploy: `https://<org>.github.io/emilian_game/`
+- The `base: '/emilian_game/'` in `vite.config.ts` aligns with this path
+
+---
+
+### 2. Game Tests (Playwright E2E)
+
+**File:** `.github/workflows/test.yml`
+
+**Trigger:**
+- Push to `dev` or `main` branches
+- Pull requests targeting `main`
+
+**Permissions:** `contents: read`
+
+**Pipeline steps:**
+
+```
+checkout → setup Node 22 → npm ci → install Playwright (Firefox) → build → start dev server → run tests
+```
+
+**Test execution:**
+
+```yaml
+- name: Run game tests
+  run: |
+    npm run dev -- --port 5173 &
+    sleep 5
+    ./node_modules/.bin/playwright test --reporter=list
+  env:
+    CI: true
+```
+
+**Key details:**
+- Installs only Firefox (`npx playwright install --with-deps firefox`)
+- Starts the Vite dev server in background on port 5173, waits 5s, then runs tests
+- Node version: 22 (vs 20 for deploy — note the discrepancy)
+- On failure: uploads `playwright-report/` as an artifact, retained 7 days
+
+---
+
+## Deployment Architecture
+
+```
+dev branch push
+      │
+      ▼
+GitHub Actions (deploy.yml)
+      │
+      ├─ npm ci
+      ├─ npm run build  →  dist/
+      │
+      ▼
+peaceiris/actions-gh-pages
+      │
+      ▼
+gh-pages branch  →  GitHub Pages CDN
+      │
+      ▼
+https://<org>.github.io/emilian_game/
+```
+
+---
+
+## Secrets & Environment Variables
+
+| Secret | Source | Used in |
+|---|---|---|
+| `GITHUB_TOKEN` | GitHub built-in | `deploy.yml` (gh-pages push) |
+| `CI=true` | Hardcoded in workflow | `test.yml` (Playwright CI mode) |
+
+No external API keys, webhook tokens, or third-party service credentials are used.
+
+---
+
+## External Services Summary
+
+| Service | Purpose | Auth |
+|---|---|---|
+| GitHub Pages | Static hosting | `GITHUB_TOKEN` (auto) |
+| GitHub Actions | CI/CD runner | GitHub-native |
+
+**No external services at runtime.** The game is entirely self-contained — no analytics, no backend, no CDN assets, no third-party APIs called from the browser.
+
+---
+
+## Node Version Notes
+
+There is a version mismatch between the two workflows:
+
+| Workflow | Node Version |
+|---|---|
+| `deploy.yml` | 20 |
+| `test.yml` | 22 |
+
+This is unlikely to cause issues with current dependencies but worth aligning for consistency.

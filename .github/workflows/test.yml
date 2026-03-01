@@ -1,0 +1,48 @@
+name: Game Tests
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps firefox
+
+      - name: Build game
+        run: npm run build
+
+      - name: Run game tests
+        run: |
+          # Start dev server in background
+          npm run dev -- --port 5173 &
+          sleep 5
+          # Run Playwright tests
+          ./node_modules/.bin/playwright test --reporter=list
+        env:
+          CI: true
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
