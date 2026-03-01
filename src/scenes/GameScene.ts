@@ -9,16 +9,26 @@ export class GameScene extends Phaser.Scene {
   private enemies!: Phaser.Physics.Arcade.Group;
   private plantEnemies: PlantEnemy[] = [];
   private items!: Phaser.Physics.Arcade.Group;
+  private itemTweens: Map<Phaser.Physics.Arcade.Sprite, Phaser.Tweens.Tween> = new Map();
+  private boostTimers: Phaser.Time.TimerEvent[] = [];
 
   private background!: Phaser.GameObjects.TileSprite;
+  private isTransitioning: boolean = false;
 
   constructor() {
     super({ key: 'GameScene' });
   }
 
   create(): void {
+    this.isTransitioning = false;
+    this.itemTweens.clear();
+    this.boostTimers = [];
+
+    const worldW = GAME_CONFIG.WORLD_WIDTH;
+    const worldH = GAME_CONFIG.WORLD_HEIGHT;
+
     // Set world bounds for the level (wider than camera)
-    this.physics.world.setBounds(0, 0, 2500, 600);
+    this.physics.world.setBounds(0, 0, worldW, worldH);
 
     // Setup background
     this.background = this.add.tileSprite(0, 0, 800, 600, 'bg-green');
@@ -26,7 +36,16 @@ export class GameScene extends Phaser.Scene {
     this.background.setScrollFactor(0);
 
     // Set camera bounds
-    this.cameras.main.setBounds(0, 0, 2500, 600);
+    this.cameras.main.setBounds(0, 0, worldW, worldH);
+
+    // Pause key (ESC)
+    this.input.keyboard?.on('keydown-ESC', () => {
+      this.scene.pause();
+      this.scene.launch('PauseScene');
+    });
+
+    // Cleanup on shutdown
+    this.events.on('shutdown', this.handleShutdown, this);
 
     // Create platforms
     this.createPlatforms();
@@ -67,13 +86,13 @@ export class GameScene extends Phaser.Scene {
     const grassFrame = 96; // Top grass tile
 
     // Ground - full level width
-    for (let x = 0; x < 2500; x += 16) {
+    for (let x = 0; x < GAME_CONFIG.WORLD_WIDTH; x += 16) {
       const tile = this.platforms.create(x + 8, 550, 'terrain', grassFrame) as Phaser.Physics.Arcade.Sprite;
       tile.refreshBody();
     }
 
     // Add dirt below ground for visual depth
-    for (let x = 0; x < 2500; x += 16) {
+    for (let x = 0; x < GAME_CONFIG.WORLD_WIDTH; x += 16) {
       this.add.image(x + 8, 566, 'terrain', 118);
       this.add.image(x + 8, 582, 'terrain', 118);
     }
@@ -215,8 +234,8 @@ export class GameScene extends Phaser.Scene {
     const body = item.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
 
-    // Floating animation
-    this.tweens.add({
+    // Floating animation (tracked so we can stop it on collection)
+    const tween = this.tweens.add({
       targets: item,
       y: y - 10,
       duration: 1000,
@@ -224,6 +243,7 @@ export class GameScene extends Phaser.Scene {
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
+    this.itemTweens.set(item, tween);
   }
 
   private setupCollisions(): void {
@@ -292,22 +312,20 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private handlePlayerEnemyCollision(
-    playerObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
-    enemyObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
-  ): void {
+  private handlePlayerEnemyCollision: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (playerObj, enemyObj) => {
+    if (this.isTransitioning) return;
+
     const player = playerObj as Player;
     const enemy = enemyObj as Enemy | PlantEnemy;
 
     if (!enemy.isEnemyDead() && !player.isPlayerInvincible()) {
       player.takeDamage(enemy.getDamage());
     }
-  }
+  };
 
-  private handleBulletHit(
-    playerObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
-    bulletObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
-  ): void {
+  private handleBulletHit: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (playerObj, bulletObj) => {
+    if (this.isTransitioning) return;
+
     const player = playerObj as Player;
     const bullet = bulletObj as Phaser.Physics.Arcade.Image;
 
@@ -315,12 +333,11 @@ export class GameScene extends Phaser.Scene {
       player.takeDamage(10); // Bullet damage
       bullet.destroy();
     }
-  }
+  };
 
-  private handleItemCollection(
-    playerObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
-    itemObj: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
-  ): void {
+  private handleItemCollection: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (playerObj, itemObj) => {
+    if (this.isTransitioning) return;
+
     const player = playerObj as Player;
     const item = itemObj as Phaser.Physics.Arcade.Sprite;
     const type = item.getData('type');
@@ -331,35 +348,48 @@ export class GameScene extends Phaser.Scene {
         this.showItemPickupText('+50 HP!', item.x, item.y);
         break;
 
-      case 'attack':
+      case 'attack': {
         const currentAttack = this.registry.get('attackBoost') || 1;
         this.registry.set('attackBoost', currentAttack * GAME_CONFIG.ITEMS.ATTACK_BOOST.multiplier);
         this.showItemPickupText('Angriff +25%!', item.x, item.y);
-        this.time.delayedCall(GAME_CONFIG.ITEMS.ATTACK_BOOST.duration, () => {
+        const timer = this.time.delayedCall(GAME_CONFIG.ITEMS.ATTACK_BOOST.duration, () => {
           this.registry.set('attackBoost', 1);
         });
+        this.boostTimers.push(timer);
         break;
+      }
 
-      case 'defense':
+      case 'defense': {
         const currentDefense = this.registry.get('defenseBoost') || 1;
+        // multiplier < 1 means damage reduction (e.g. 0.75 = take 75% damage = 25% reduction)
         this.registry.set('defenseBoost', currentDefense * GAME_CONFIG.ITEMS.DEFENSE_BOOST.multiplier);
         this.showItemPickupText('Verteidigung +25%!', item.x, item.y);
-        this.time.delayedCall(GAME_CONFIG.ITEMS.DEFENSE_BOOST.duration, () => {
+        const timer = this.time.delayedCall(GAME_CONFIG.ITEMS.DEFENSE_BOOST.duration, () => {
           this.registry.set('defenseBoost', 1);
         });
+        this.boostTimers.push(timer);
         break;
+      }
 
-      case 'life':
+      case 'life': {
         const currentLives = this.registry.get('lives') || 3;
-        this.registry.set('lives', currentLives + 1);
+        const newLives = Math.min(currentLives + 1, 9);
+        this.registry.set('lives', newLives);
         this.showItemPickupText('+1 Leben!', item.x, item.y);
-        this.events.emit('livesUpdated', currentLives + 1);
+        this.events.emit('livesUpdated', newLives);
         break;
+      }
     }
 
-    // Destroy the item
+    // Stop the floating tween before destroying
+    const tween = this.itemTweens.get(item);
+    if (tween) {
+      tween.stop();
+      this.itemTweens.delete(item);
+    }
+
     item.destroy();
-  }
+  };
 
   private showItemPickupText(message: string, x: number, y: number): void {
     const text = this.add.text(x, y, message, {
@@ -382,14 +412,21 @@ export class GameScene extends Phaser.Scene {
   private handlePlayerDeath(): void {
     const lives = this.registry.get('lives') || 3;
 
+    // Clear active boost timers and reset boosts
+    this.boostTimers.forEach(timer => timer.remove(false));
+    this.boostTimers = [];
+    this.registry.set('attackBoost', 1);
+    this.registry.set('defenseBoost', 1);
+
     if (lives > 1) {
       // Respawn
       this.registry.set('lives', lives - 1);
       this.registry.set('health', GAME_CONFIG.PLAYER.MAX_HEALTH);
       this.events.emit('livesUpdated', lives - 1);
 
-      // Reset player position
+      // Reset player position and clear pending timers
       this.player.setPosition(100, 480);
+      this.player.resetState();
       this.player.heal(GAME_CONFIG.PLAYER.MAX_HEALTH);
 
       // Brief invincibility
@@ -404,8 +441,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   private gameOver(): void {
+    this.isTransitioning = true;
     this.scene.pause();
     this.scene.launch('GameOverScene');
+  }
+
+  private handleShutdown(): void {
+    // Kill all tweens to prevent memory leaks
+    this.tweens.killAll();
+    this.itemTweens.clear();
+
+    // Clear boost timers
+    this.boostTimers.forEach(timer => timer.remove(false));
+    this.boostTimers = [];
+
+    // Remove event listeners
+    this.events.off('playerAttack');
+    this.events.off('enemyKilled');
+    this.events.off('playerDied');
+    this.events.off('shutdown', this.handleShutdown, this);
   }
 
   update(): void {

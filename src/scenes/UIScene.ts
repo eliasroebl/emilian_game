@@ -6,10 +6,6 @@ export class UIScene extends Phaser.Scene {
   private healthText!: Phaser.GameObjects.Text;
   private livesText!: Phaser.GameObjects.Text;
   private scoreText!: Phaser.GameObjects.Text;
-  private playerNameText!: Phaser.GameObjects.Text;
-
-  private currentHealth: number = 100;
-  private maxHealth: number = 100;
 
   constructor() {
     super({ key: 'UIScene' });
@@ -18,7 +14,7 @@ export class UIScene extends Phaser.Scene {
   create(): void {
     // Player name display
     const playerName = this.registry.get('playerName') || 'Held';
-    this.playerNameText = this.add.text(16, 16, playerName, {
+    this.add.text(16, 16, playerName, {
       fontSize: '20px',
       color: '#FFD700',
       fontStyle: 'bold',
@@ -108,12 +104,18 @@ export class UIScene extends Phaser.Scene {
     gameScene.events.on('scoreUpdated', (score: number) => {
       this.updateScore(score);
     });
+
+    // Cleanup on shutdown
+    this.events.on('shutdown', () => {
+      gameScene.events.off('playerDamaged');
+      gameScene.events.off('playerHealed');
+      gameScene.events.off('livesUpdated');
+      gameScene.events.off('scoreUpdated');
+      this.tweens.killAll();
+    });
   }
 
   private updateHealthBar(health: number, maxHealth: number): void {
-    this.currentHealth = health;
-    this.maxHealth = maxHealth;
-
     this.healthBar.clear();
 
     // Border

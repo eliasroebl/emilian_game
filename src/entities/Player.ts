@@ -5,7 +5,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyW!: Phaser.Input.Keyboard.Key;
   private keyA!: Phaser.Input.Keyboard.Key;
-  private keyS!: Phaser.Input.Keyboard.Key;
   private keyD!: Phaser.Input.Keyboard.Key;
   private keyX!: Phaser.Input.Keyboard.Key;
   private keyC!: Phaser.Input.Keyboard.Key;
@@ -26,6 +25,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private maxHealth: number;
 
   private facingRight: boolean = true;
+
+  private pendingTimers: Phaser.Time.TimerEvent[] = [];
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 'player-idle');
@@ -60,7 +61,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.cursors = this.scene.input.keyboard.createCursorKeys();
     this.keyW = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
     this.keyA = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-    this.keyS = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+
     this.keyD = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     this.keyX = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
     this.keyC = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
@@ -74,8 +75,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     if (this.isAttacking) {
-      // Slow down during attack
+      // Slow down during attack, keep hitbox in sync with player position
       this.setVelocityX(this.body?.velocity.x ? this.body.velocity.x * 0.8 : 0);
+      this.updateAttackHitbox();
       return;
     }
 
@@ -140,7 +142,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.isAttacking = true;
     this.canAttack = false;
 
-    // Create attack hitbox in front of player
+    // Create attack hitbox in front of player (position updated in updateAttackHitbox)
     const attackX = this.x + (this.facingRight ? GAME_CONFIG.PLAYER.ATTACK_RANGE : -GAME_CONFIG.PLAYER.ATTACK_RANGE);
     this.attackHitbox = this.scene.add.rectangle(attackX, this.y, 40, 40, 0xff0000, 0.3);
     this.scene.physics.add.existing(this.attackHitbox);
@@ -149,22 +151,30 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.scene.events.emit('playerAttack', this.attackHitbox, this.getAttackDamage());
 
     // Remove hitbox after short time
-    this.scene.time.delayedCall(100, () => {
+    this.addTimer(this.scene.time.delayedCall(100, () => {
       if (this.attackHitbox) {
         this.attackHitbox.destroy();
         this.attackHitbox = null;
       }
-    });
+    }));
 
     // End attack state
-    this.scene.time.delayedCall(200, () => {
+    this.addTimer(this.scene.time.delayedCall(200, () => {
       this.isAttacking = false;
-    });
+    }));
 
     // Attack cooldown
-    this.scene.time.delayedCall(GAME_CONFIG.PLAYER.ATTACK_COOLDOWN, () => {
+    this.addTimer(this.scene.time.delayedCall(GAME_CONFIG.PLAYER.ATTACK_COOLDOWN, () => {
       this.canAttack = true;
-    });
+    }));
+  }
+
+  /** Keep hitbox position in sync with player while attacking */
+  private updateAttackHitbox(): void {
+    if (this.attackHitbox) {
+      this.attackHitbox.x = this.x + (this.facingRight ? GAME_CONFIG.PLAYER.ATTACK_RANGE : -GAME_CONFIG.PLAYER.ATTACK_RANGE);
+      this.attackHitbox.y = this.y;
+    }
   }
 
   private handleDodge(): void {
@@ -174,6 +184,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   private performDodge(): void {
+    // Prevent stacking: don't dodge if already dodging
+    if (this.isDodging) return;
+
     this.isDodging = true;
     this.canDodge = false;
     this.isInvincible = true;
@@ -184,17 +197,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // Visual feedback - flash/fade
     this.setAlpha(0.5);
 
-    // End dodge after duration
-    this.scene.time.delayedCall(GAME_CONFIG.PLAYER.DODGE_DURATION, () => {
+    // End dodge after duration - explicitly reset invincibility from dodge
+    this.addTimer(this.scene.time.delayedCall(GAME_CONFIG.PLAYER.DODGE_DURATION, () => {
       this.isDodging = false;
       this.isInvincible = false;
       this.setAlpha(1);
-    });
+    }));
 
     // Dodge cooldown
-    this.scene.time.delayedCall(GAME_CONFIG.PLAYER.DODGE_COOLDOWN, () => {
+    this.addTimer(this.scene.time.delayedCall(GAME_CONFIG.PLAYER.DODGE_COOLDOWN, () => {
       this.canDodge = true;
-    });
+    }));
   }
 
   private updateAnimations(): void {
@@ -224,11 +237,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   public takeDamage(amount: number): void {
     if (this.isInvincible) return;
 
-    // Apply defense boost
-    const defenseBoost = this.scene.registry.get('defenseBoost') || 1;
+    // Apply defense boost (multiplier < 1 = damage reduction, e.g. 0.75 = 25% less damage)
+    const defenseBoost = Math.max(0.1, Math.min(this.scene.registry.get('defenseBoost') || 1, 2));
     const actualDamage = Math.round(amount * defenseBoost);
 
-    this.health -= actualDamage;
+    this.health = Math.max(0, this.health - actualDamage);
     this.scene.registry.set('health', this.health);
 
     // Visual feedback
@@ -252,9 +265,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     });
 
     // End invincibility
-    this.scene.time.delayedCall(GAME_CONFIG.PLAYER.INVINCIBILITY_DURATION, () => {
+    this.addTimer(this.scene.time.delayedCall(GAME_CONFIG.PLAYER.INVINCIBILITY_DURATION, () => {
       this.isInvincible = false;
-    });
+    }));
 
     // Emit damage event
     this.scene.events.emit('playerDamaged', this.health, this.maxHealth);
@@ -276,7 +289,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   public getAttackDamage(): number {
-    const attackBoost = this.scene.registry.get('attackBoost') || 1;
+    const attackBoost = Math.max(0.5, Math.min(this.scene.registry.get('attackBoost') || 1, 3));
     return Math.round(GAME_CONFIG.PLAYER.ATTACK_DAMAGE * attackBoost);
   }
 
@@ -290,5 +303,40 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   public isPlayerInvincible(): boolean {
     return this.isInvincible;
+  }
+
+  /** Cancel all pending timers and reset transient state. Called on respawn. */
+  public resetState(): void {
+    // Cancel all pending timers
+    this.pendingTimers.forEach(timer => timer.remove(false));
+    this.pendingTimers = [];
+
+    // Destroy active attack hitbox
+    if (this.attackHitbox) {
+      this.attackHitbox.destroy();
+      this.attackHitbox = null;
+    }
+
+    // Reset flags
+    this.isAttacking = false;
+    this.canAttack = true;
+    this.isDodging = false;
+    this.canDodge = true;
+    this.isInvincible = false;
+    this.hasDoubleJumped = false;
+    this.canDoubleJump = false;
+
+    // Reset visuals
+    this.setAlpha(1);
+    this.clearTint();
+  }
+
+  private addTimer(timer: Phaser.Time.TimerEvent): void {
+    this.pendingTimers.push(timer);
+  }
+
+  destroy(fromScene?: boolean): void {
+    this.resetState();
+    super.destroy(fromScene);
   }
 }

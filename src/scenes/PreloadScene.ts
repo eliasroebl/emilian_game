@@ -41,6 +41,11 @@ export class PreloadScene extends Phaser.Scene {
       percentText.destroy();
     });
 
+    // Log asset load failures
+    this.load.on('loaderror', (fileObj: Phaser.Loader.File) => {
+      console.error(`Failed to load asset: ${fileObj.key} (${fileObj.url})`);
+    });
+
     // Load all game assets
     this.loadPlayerAssets();
     this.loadEnemyAssets();

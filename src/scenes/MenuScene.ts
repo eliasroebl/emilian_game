@@ -136,9 +136,15 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
+  private sanitizeName(raw: string): string {
+    // Allow only alphanumeric, spaces, hyphens, underscores
+    return raw.replace(/[^a-zA-Z0-9äöüÄÖÜß \-_]/g, '').trim().slice(0, 20);
+  }
+
   private startGame(): void {
-    // Get player name
-    this.playerName = this.nameInput?.value.trim() || 'Held';
+    // Get and sanitize player name
+    const rawName = this.nameInput?.value ?? '';
+    this.playerName = this.sanitizeName(rawName) || 'Held';
 
     // Remove the input element
     if (this.nameInput) {
