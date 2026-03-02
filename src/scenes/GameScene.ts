@@ -444,12 +444,12 @@ export class GameScene extends Phaser.Scene {
     this.createPlatform(7240, 750, 3);   // left
     this.createPlatform(7380, 780, 4);   // bottom — hidden chamber
     this.createPlatform(7290, 780, 3);   // wide bottom chamber (connected)
-    // Exit path back up on right side of shaft
-    this.createPlatform(7490, 740, 3);
-    this.createPlatform(7500, 700, 3);
-    this.createPlatform(7510, 660, 3);
-    this.createPlatform(7500, 620, 3);
-    this.createPlatform(7490, 580, 3);
+    // Exit path — zigzag climb back up through the shaft
+    this.createPlatform(7430, 720, 3);   // right of bottom chamber
+    this.createPlatform(7340, 670, 3);   // left
+    this.createPlatform(7440, 620, 3);   // right
+    this.createPlatform(7350, 570, 3);   // left
+    this.createPlatform(7450, 520, 3);   // right — near exit ledge
     // Continue right from shaft exit
     this.createPlatform(7600, 480, 4);
     this.createPlatform(7720, 450, 4);
@@ -508,8 +508,8 @@ export class GameScene extends Phaser.Scene {
     this.createPlatform(10330, 460, 2);
     this.createPlatform(10400, 430, 2);
     this.createPlatform(10470, 460, 2);
-    this.createPlatform(10540, 490, 1);   // 1-tile!
-    this.createPlatform(10600, 460, 1);   // 1-tile!
+    this.createPlatform(10540, 490, 2);   // narrow but fair
+    this.createPlatform(10600, 460, 2);   // narrow but fair
     this.createPlatform(10640, 430, 2);
     // Wide arena before boss (give player room)
     this.createPlatform(10660, 490, 20);  // BOSS ARENA — wide fighting platform
@@ -523,19 +523,14 @@ export class GameScene extends Phaser.Scene {
 
     // ── Zone 13 — Gipfelsturm (11200–12000) — Summit ────────────────────────
     // Alternating high/low platforms (forces constant movement)
-    this.createPlatform(11260, 490, 3);   // low
-    this.createPlatform(11340, 390, 3);   // high
-    this.createPlatform(11420, 480, 2);   // low
-    this.createPlatform(11490, 380, 3);   // high
-    this.createPlatform(11560, 470, 2);   // low
-    // Epic ascending staircase to summit flag
-    this.createPlatform(11620, 460, 2);   // step 1
-    this.createPlatform(11660, 430, 2);   // step 2
-    this.createPlatform(11700, 400, 2);   // step 3
-    this.createPlatform(11740, 370, 2);   // step 4
-    this.createPlatform(11760, 340, 2);   // step 5
-    this.createPlatform(11770, 310, 2);   // step 6
-    this.createPlatform(11780, 285, 4);   // SUMMIT — flag platform (wide enough to land safely)
+    this.createPlatform(11250, 490, 3);   // low
+    this.createPlatform(11370, 390, 3);   // high (120px gap, 100px rise)
+    this.createPlatform(11480, 480, 3);   // low  (110px gap, 90px drop)
+    // Ascending staircase to summit flag — each step distinct and rewarding
+    this.createPlatform(11580, 440, 3);   // step 1 — easing into the climb
+    this.createPlatform(11660, 385, 3);   // step 2 — steady rise
+    this.createPlatform(11740, 335, 3);   // step 3 — getting higher
+    this.createPlatform(11800, 285, 4);   // SUMMIT — flag platform
   }
 
   private createBouncePlatform(x: number, y: number, widthTiles: number): void {
@@ -806,7 +801,7 @@ export class GameScene extends Phaser.Scene {
     c16.setPatrolDistance(40);
     this.enemies.add(c16);
 
-    const r12 = EnemyFactory.createRadish(this, 11420, 350);
+    const r12 = EnemyFactory.createRadish(this, 11390, 350);
     r12.setPatrolDistance(20);
     this.enemies.add(r12);
 
@@ -867,7 +862,7 @@ export class GameScene extends Phaser.Scene {
       // Zone 12 — Vulkan-Vorfeld (3 coins before boss arena)
       [10320, 460], [10470, 420], [10650, 460],
       // Zone 13 — Gipfelsturm (2 coins on summit approach)
-      [11350, 460], [11760, 350],
+      [11385, 365], [11745, 310],
     ];
     coinPositions.forEach(([cx, cy]) => {
       this.createCoin(cx, cy);
@@ -995,7 +990,7 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Zone 13: summit approach
-    this.add.text(11600, 440, '🏔️ Gipfel — fast da!', {
+    this.add.text(11590, 415, '🏔️ Gipfel — fast da!', {
       fontSize: '14px', color: '#FFD700', stroke: '#000000', strokeThickness: 3,
     }).setOrigin(0.5);
   }
