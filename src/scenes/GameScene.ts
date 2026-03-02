@@ -1315,8 +1315,11 @@ export class GameScene extends Phaser.Scene {
         const cur = (this.registry.get('attackBoost') as number) || 1;
         this.registry.set('attackBoost', cur * GAME_CONFIG.ITEMS.ATTACK_BOOST.multiplier);
         this.showPickupText('Angriff ↑', item.x, item.y, '#ff9900');
-        const attackTimer = this.time.delayedCall(GAME_CONFIG.ITEMS.ATTACK_BOOST.duration, () => {
+        const atkDuration = GAME_CONFIG.ITEMS.ATTACK_BOOST.duration;
+        this.events.emit('boostStart', 'attack', atkDuration);
+        const attackTimer = this.time.delayedCall(atkDuration, () => {
           this.registry.set('attackBoost', 1);
+          this.events.emit('boostEnd', 'attack');
         });
         this.boostTimers.push(attackTimer);
         break;
@@ -1325,8 +1328,11 @@ export class GameScene extends Phaser.Scene {
         const cur = (this.registry.get('defenseBoost') as number) || 1;
         this.registry.set('defenseBoost', cur * GAME_CONFIG.ITEMS.DEFENSE_BOOST.multiplier);
         this.showPickupText('Abwehr ↑', item.x, item.y, '#66aaff');
-        const defenseTimer = this.time.delayedCall(GAME_CONFIG.ITEMS.DEFENSE_BOOST.duration, () => {
+        const defDuration = GAME_CONFIG.ITEMS.DEFENSE_BOOST.duration;
+        this.events.emit('boostStart', 'defense', defDuration);
+        const defenseTimer = this.time.delayedCall(defDuration, () => {
           this.registry.set('defenseBoost', 1);
+          this.events.emit('boostEnd', 'defense');
         });
         this.boostTimers.push(defenseTimer);
         break;
@@ -1403,6 +1409,8 @@ export class GameScene extends Phaser.Scene {
     this.boostTimers = [];
     this.registry.set('attackBoost', 1);
     this.registry.set('defenseBoost', 1);
+    this.events.emit('boostEnd', 'attack');
+    this.events.emit('boostEnd', 'defense');
 
     if (lives > 1) {
       this.livesLost++;
@@ -1425,6 +1433,13 @@ export class GameScene extends Phaser.Scene {
 
   private handleGameOver(): void {
     this.isTransitioning = true;
+
+    // Save highscore on game over (not just on level complete)
+    const score = (this.registry.get('score') as number) || 0;
+    const prevHighscore = parseInt(localStorage.getItem('highscore') || '0', 10);
+    const newHighscore = Math.max(score, prevHighscore);
+    localStorage.setItem('highscore', newHighscore.toString());
+
     this.scene.pause();
     this.scene.launch('GameOverScene');
   }

@@ -53,6 +53,7 @@ export class VirtualControlsScene extends Phaser.Scene {
     this.createActionButton(BTN_JUMP,   'jump');
     this.createActionButton(BTN_ATTACK, 'attack');
     this.createActionButton(BTN_DODGE,  'dodge');
+    this.createPauseButton();
 
     // Clean up on shutdown
     this.events.on('shutdown', this.handleShutdown, this);
@@ -199,6 +200,43 @@ export class VirtualControlsScene extends Phaser.Scene {
     zone.on('pointerup',     () => setKey(false));
     zone.on('pointerout',    () => setKey(false));
     zone.on('pointercancel', () => setKey(false));
+  }
+
+  // ── Pause button (top-right) ──────────────────────────────────────────────
+
+  private createPauseButton(): void {
+    const x = 770;
+    const y = 30;
+    const r = 20;
+
+    const gfx = this.add.graphics();
+    gfx.setScrollFactor(0).setDepth(100);
+    gfx.fillStyle(0x333333, 0.5);
+    gfx.fillCircle(x, y, r);
+    gfx.lineStyle(1, 0xffffff, 0.4);
+    gfx.strokeCircle(x, y, r);
+
+    // Pause icon (two vertical bars)
+    const label = this.add.text(x, y, '⏸', {
+      fontSize: '18px',
+      color: '#ffffff',
+      stroke: '#000',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(101).setAlpha(0.7);
+
+    const zone = this.add.zone(x, y, r * 2.4, r * 2.4);
+    zone.setScrollFactor(0).setDepth(102).setInteractive();
+
+    zone.on('pointerdown', () => {
+      label.setAlpha(1);
+      const gameScene = this.scene.get('GameScene');
+      if (gameScene && gameScene.scene.isActive()) {
+        gameScene.scene.pause();
+        gameScene.scene.launch('PauseScene');
+      }
+    });
+    zone.on('pointerup', () => label.setAlpha(0.7));
+    zone.on('pointerout', () => label.setAlpha(0.7));
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

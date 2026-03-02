@@ -11,6 +11,12 @@ export class UIScene extends Phaser.Scene {
   // Progress bar
   private progressBar!: Phaser.GameObjects.Graphics;
   private readonly WORLD_WIDTH = 12000;
+  // Boost indicators
+  private boostBar!: Phaser.GameObjects.Graphics;
+  private attackBoostEnd: number = 0;   // scene time when attack boost expires
+  private defenseBoostEnd: number = 0;  // scene time when defense boost expires
+  private attackBoostDur: number = 0;   // total duration for fill ratio
+  private defenseBoostDur: number = 0;
 
   constructor() {
     super({ key: 'UIScene' });
@@ -99,6 +105,9 @@ export class UIScene extends Phaser.Scene {
       controlsHint.setOrigin(0.5);
     }
 
+    // Boost indicator bar (drawn each frame in update)
+    this.boostBar = this.add.graphics();
+
     // ── Progress bar (bottom strip) ─────────────────────────────────────────
     // Dark background strip
     const progressBg = this.add.graphics();
@@ -135,6 +144,47 @@ export class UIScene extends Phaser.Scene {
       }
     } catch {
       // GameScene might not be ready yet
+    }
+
+    // Draw active boost indicators
+    this.drawBoostBars();
+  }
+
+  private drawBoostBars(): void {
+    this.boostBar.clear();
+    const now = this.time.now;
+    const barX = 16;
+    const barW = 120;
+    const barH = 8;
+    let y = 105; // below lives display
+
+    // Attack boost
+    if (this.attackBoostEnd > now && this.attackBoostDur > 0) {
+      const remaining = (this.attackBoostEnd - now) / this.attackBoostDur;
+      // Background
+      this.boostBar.fillStyle(0x000000, 0.5);
+      this.boostBar.fillRect(barX, y, barW, barH);
+      // Fill (orange)
+      this.boostBar.fillStyle(0xff9900, 0.9);
+      this.boostBar.fillRect(barX, y, barW * remaining, barH);
+      // Border
+      this.boostBar.lineStyle(1, 0xffffff, 0.6);
+      this.boostBar.strokeRect(barX, y, barW, barH);
+      y += barH + 4;
+    }
+
+    // Defense boost
+    if (this.defenseBoostEnd > now && this.defenseBoostDur > 0) {
+      const remaining = (this.defenseBoostEnd - now) / this.defenseBoostDur;
+      // Background
+      this.boostBar.fillStyle(0x000000, 0.5);
+      this.boostBar.fillRect(barX, y, barW, barH);
+      // Fill (blue)
+      this.boostBar.fillStyle(0x66aaff, 0.9);
+      this.boostBar.fillRect(barX, y, barW * remaining, barH);
+      // Border
+      this.boostBar.lineStyle(1, 0xffffff, 0.6);
+      this.boostBar.strokeRect(barX, y, barW, barH);
     }
   }
 
@@ -232,6 +282,26 @@ export class UIScene extends Phaser.Scene {
       this.coinText.setText(`🪙 0/${totalCoins}`);
     }
 
+    // Boost start/end events
+    gameScene.events.on('boostStart', (type: string, duration: number) => {
+      const end = this.time.now + duration;
+      if (type === 'attack') {
+        this.attackBoostEnd = end;
+        this.attackBoostDur = duration;
+      } else if (type === 'defense') {
+        this.defenseBoostEnd = end;
+        this.defenseBoostDur = duration;
+      }
+    });
+
+    gameScene.events.on('boostEnd', (type: string) => {
+      if (type === 'attack') {
+        this.attackBoostEnd = 0;
+      } else if (type === 'defense') {
+        this.defenseBoostEnd = 0;
+      }
+    });
+
     // Cleanup on shutdown
     this.events.on('shutdown', () => {
       gameScene.events.off('playerDamaged');
@@ -239,6 +309,8 @@ export class UIScene extends Phaser.Scene {
       gameScene.events.off('livesUpdated');
       gameScene.events.off('scoreUpdated');
       gameScene.events.off('coinCollected');
+      gameScene.events.off('boostStart');
+      gameScene.events.off('boostEnd');
       this.tweens.killAll();
     });
   }
